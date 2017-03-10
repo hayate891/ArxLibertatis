@@ -573,7 +573,6 @@ float CheckAnythingInCylinder(const Cylinder & cyl, Entity * ioo, long flags) {
 			{
 				Cylinder & io_cyl = io->physics.cyl;
 				io_cyl = GetIOCyl(io);
-				float dealt = 0;
 
 				if (	(io->gameFlags & GFLAG_PLATFORM)
 					||	((flags & CFLAG_COLLIDE_NOCOL) && (io->ioflags & IO_NPC) &&  (io->ioflags & IO_NO_COLLISIONS))
@@ -656,7 +655,7 @@ float CheckAnythingInCylinder(const Cylinder & cyl, Entity * ioo, long flags) {
 									SendIOScriptEvent(ioo, SM_COLLIDE_NPC);
 							}
 
-							if(!dealt && (ioo->damager_damages > 0 || io->damager_damages > 0)) {
+							if(ioo->damager_damages > 0 || io->damager_damages > 0) {
 
 								if(ioo->damager_damages > 0)
 									ARX_DAMAGES_DealDamages(EntityHandle(i), ioo->damager_damages, ioo->index(), ioo->damager_type, &io->pos);
@@ -699,6 +698,7 @@ float CheckAnythingInCylinder(const Cylinder & cyl, Entity * ioo, long flags) {
 						std::vector<EERIE_VERTEX> & vlist = io->obj->vertexlist3;
 						
 						if(io->obj->grouplist.size() > 10) {
+							bool dealt = false;
 							for(size_t ii = 0; ii < io->obj->grouplist.size(); ii++) {
 								long idx = io->obj->grouplist[ii].origin;
 								sp.origin = vlist[idx].v;
@@ -733,7 +733,7 @@ float CheckAnythingInCylinder(const Cylinder & cyl, Entity * ioo, long flags) {
 										}
 
 										if(!dealt && (ioo->damager_damages > 0 || io->damager_damages > 0)) {
-											dealt = 1;
+											dealt = true;
 
 											if(ioo->damager_damages > 0)
 												ARX_DAMAGES_DealDamages(EntityHandle(i), ioo->damager_damages, ioo->index(), ioo->damager_type, &io->pos);
@@ -766,7 +766,8 @@ float CheckAnythingInCylinder(const Cylinder & cyl, Entity * ioo, long flags) {
 								step = 4;
 							else
 								step = 6;
-
+							
+							bool dealt = false;
 							for(size_t ii = 1; ii < nbv; ii += step) {
 								if(ii != io->obj->origin) {
 									sp.origin = vlist[ii].v;
@@ -793,7 +794,7 @@ float CheckAnythingInCylinder(const Cylinder & cyl, Entity * ioo, long flags) {
 										}
 					
 										if(!dealt && ioo && (ioo->damager_damages > 0 || io->damager_damages > 0)) {
-											dealt = 1;
+											dealt = true;
 											
 											if(ioo->damager_damages > 0)
 												ARX_DAMAGES_DealDamages(EntityHandle(i), ioo->damager_damages, ioo->index(), ioo->damager_type, &io->pos);

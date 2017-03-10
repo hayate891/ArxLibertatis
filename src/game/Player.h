@@ -404,23 +404,12 @@ struct ARXCHARACTER {
 
 extern float CURRENT_PLAYER_COLOR;
 
-struct KEYRING_SLOT {
-	char slot[64];
-};
-
-
-// Quests Management (QuestLogBook)
-
-struct STRUCT_QUEST {
-	std::string ident;
-};
-
 extern ARXCHARACTER player;
 extern EERIE_3DOBJ * hero;
 extern ANIM_HANDLE * herowaitbook;
 extern ANIM_HANDLE * herowait_2h;
-extern std::vector<STRUCT_QUEST> PlayerQuest;
-extern std::vector<KEYRING_SLOT> Keyring;
+extern std::vector<std::string> g_playerQuestLogEntries;
+extern std::vector<std::string> g_playerKeyring;
 
 extern bool BLOCK_PLAYER_CONTROLS;
 extern bool USE_PLAYERCOLLISIONS;
@@ -436,7 +425,7 @@ void ARX_PLAYER_RectifyPosition();
 void ARX_PLAYER_Frame_Update();
 void ARX_PLAYER_Manage_Movement();
 void ARX_PLAYER_Manage_Death();
-void ARX_PLAYER_Quest_Add(const std::string & quest, bool _bLoad = false);
+void ARX_PLAYER_Quest_Add(const std::string & quest);
 void ARX_PLAYER_Quest_Init();
 Vec3f ARX_PLAYER_FrontPos();
 void ARX_PLAYER_ComputePlayerFullStats();

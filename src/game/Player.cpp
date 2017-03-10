@@ -163,11 +163,11 @@ static ArxInstant ROTATE_START = ArxInstant_ZERO;
 ANIM_HANDLE * herowaitbook = NULL;
 ANIM_HANDLE * herowait_2h = NULL;
 
-std::vector<KEYRING_SLOT> Keyring;
+std::vector<std::string> g_playerKeyring;
 
 static unsigned long FALLING_TIME = 0;
 
-std::vector<STRUCT_QUEST> PlayerQuest;
+std::vector<std::string> g_playerQuestLogEntries;
 
 bool ARX_PLAYER_IsInFightMode() {
 	arx_assert(entities.player());
@@ -209,7 +209,7 @@ bool ARX_PLAYER_IsInFightMode() {
  * \brief Init/Reset player Keyring structures
  */
 void ARX_KEYRING_Init() {
-	Keyring.clear();
+	g_playerKeyring.clear();
 }
 
 /*!
@@ -217,9 +217,7 @@ void ARX_KEYRING_Init() {
  * \param key
  */
 void ARX_KEYRING_Add(const std::string & key) {
-	Keyring.resize(Keyring.size() + 1);
-	memset(&Keyring.back(), 0, sizeof(KEYRING_SLOT));
-	strcpy(Keyring.back().slot, key.c_str());
+	g_playerKeyring.push_back(key);
 }
 
 /*!
@@ -227,8 +225,8 @@ void ARX_KEYRING_Add(const std::string & key) {
  * \param io
  */
 void ARX_KEYRING_Combine(Entity * io) {
-	for(size_t i = 0; i < Keyring.size(); i++) {
-		if(SendIOScriptEvent(io, SM_COMBINE, Keyring[i].slot) == REFUSE) {
+	for(size_t i = 0; i < g_playerKeyring.size(); i++) {
+		if(SendIOScriptEvent(io, SM_COMBINE, g_playerKeyring[i]) == REFUSE) {
 			return;
 		}
 	}
@@ -327,7 +325,7 @@ static void ARX_PLAYER_ManageTorch() {
  * \brief Init/Reset player Quest structures
  */
 void ARX_PLAYER_Quest_Init() {
-	PlayerQuest.clear();
+	g_playerQuestLogEntries.clear();
 	gui::updateQuestBook();
 }
 
@@ -398,14 +396,9 @@ void ARX_Player_Rune_Remove(RuneFlag _ulRune)
  * \param quest
  * \param _bLoad
  */
-void ARX_PLAYER_Quest_Add(const std::string & quest, bool _bLoad) {
+void ARX_PLAYER_Quest_Add(const std::string & quest) {
 	
-	PlayerQuest.push_back(STRUCT_QUEST());
-	PlayerQuest.back().ident = quest;
-	
-	if(!_bLoad)
-		g_hudRoot.bookIconGui.requestHalo();
-	
+	g_playerQuestLogEntries.push_back(quest);
 	gui::updateQuestBook();
 }
 
@@ -507,33 +500,36 @@ void ARX_PLAYER_ComputePlayerFullStats() {
 	// External modifiers
 	
 	// Calculate for modifiers from spells
-		SpellBase * spell;
-		
-		spell = spells.getSpellOnTarget(EntityHandle_Player, SPELL_ARMOR);
+	{
+		SpellBase * spell = spells.getSpellOnTarget(EntityHandle_Player, SPELL_ARMOR);
 		if(spell) {
 			player.m_miscMod.armorClass += spell->m_level;
 		}
-		
-		spell = spells.getSpellOnTarget(EntityHandle_Player, SPELL_LOWER_ARMOR);
+	}
+	{
+		SpellBase * spell = spells.getSpellOnTarget(EntityHandle_Player, SPELL_LOWER_ARMOR);
 		if(spell) {
 			player.m_miscMod.armorClass -= spell->m_level;
 		}
-		
-		spell = spells.getSpellOnTarget(EntityHandle_Player, SPELL_CURSE);
+	}
+	{
+		SpellBase * spell = spells.getSpellOnTarget(EntityHandle_Player, SPELL_CURSE);
 		if(spell) {
 			player.m_attributeMod.strength -= spell->m_level;
 			player.m_attributeMod.constitution -= spell->m_level;
 			player.m_attributeMod.dexterity -= spell->m_level;
 			player.m_attributeMod.mind -= spell->m_level;
 		}
-	
-		spell = spells.getSpellOnTarget(EntityHandle_Player, SPELL_BLESS);
+	}
+	{
+		SpellBase * spell = spells.getSpellOnTarget(EntityHandle_Player, SPELL_BLESS);
 		if(spell) {
 			player.m_attributeMod.strength += spell->m_level;
 			player.m_attributeMod.dexterity += spell->m_level;
 			player.m_attributeMod.constitution += spell->m_level;
 			player.m_attributeMod.mind += spell->m_level;
 		}
+	}
 	
 	// Calculate for modifiers from cheats
 	if(cur_mr == 3) {

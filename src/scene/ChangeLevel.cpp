@@ -626,8 +626,8 @@ static long ARX_CHANGELEVEL_Push_Player(long level) {
 	ARX_CHANGELEVEL_PLAYER * asp;
 
 	long allocsize = sizeof(ARX_CHANGELEVEL_PLAYER) + 48000;
-	allocsize += Keyring.size() * 64;
-	allocsize += 80 * PlayerQuest.size();
+	allocsize += g_playerKeyring.size() * SAVED_KEYRING_SLOT_SIZE;
+	allocsize += SAVED_QUEST_SLOT_SIZE * g_playerQuestLogEntries.size();
 	allocsize += sizeof(SavedMapMarkerData) * g_miniMap.mapMarkerCount();
 
 	char * dat = new char[allocsize];
@@ -752,8 +752,8 @@ static long ARX_CHANGELEVEL_Push_Player(long level) {
 	asp->skin = player.skin;
 	
 	asp->xp = player.xp;
-	asp->nb_PlayerQuest = PlayerQuest.size();
-	asp->keyring_nb = Keyring.size();
+	asp->nb_PlayerQuest = g_playerQuestLogEntries.size();
+	asp->keyring_nb = g_playerKeyring.size();
 	asp->Global_Magic_Mode = GLOBAL_MAGIC_MODE;
 	asp->Nb_Mapmarkers = g_miniMap.mapMarkerCount();
 	
@@ -775,16 +775,17 @@ static long ARX_CHANGELEVEL_Push_Player(long level) {
 			strcpy(asp->equiped[k], "");
 	}
 	
-	for(size_t i = 0; i < PlayerQuest.size(); i++) {
-		memset(dat + pos, 0, 80);
-		assert(PlayerQuest[i].ident.length() < 80);
-		strcpy((char *)(dat + pos), PlayerQuest[i].ident.c_str());
-		pos += 80;
+	for(size_t i = 0; i < g_playerQuestLogEntries.size(); i++) {
+		memset(dat + pos, 0, SAVED_QUEST_SLOT_SIZE);
+		assert(g_playerQuestLogEntries[i].length() < SAVED_QUEST_SLOT_SIZE);
+		strcpy((char *)(dat + pos), g_playerQuestLogEntries[i].c_str());
+		pos += SAVED_QUEST_SLOT_SIZE;
 	}
 	
-	for(size_t i = 0; i < Keyring.size(); i++) {
-		assert(sizeof(Keyring[i].slot) == SAVED_KEYRING_SLOT_SIZE);
-		memcpy((char *)(dat + pos), Keyring[i].slot, SAVED_KEYRING_SLOT_SIZE);
+	for(size_t i = 0; i < g_playerKeyring.size(); i++) {
+		memset(dat + pos, 0, SAVED_KEYRING_SLOT_SIZE);
+		assert(g_playerKeyring[i].length() < SAVED_KEYRING_SLOT_SIZE);
+		strcpy((char *)(dat + pos), g_playerKeyring[i].c_str());
 		pos += SAVED_KEYRING_SLOT_SIZE;
 	}
 	
@@ -1779,15 +1780,15 @@ static long ARX_CHANGELEVEL_Pop_Player() {
 		inventory[bag][x][y].show = asp->inventory_show[bag][x][y] != 0;
 	}
 	
-	if(size < pos + (asp->nb_PlayerQuest * 80)) {
+	if(size < pos + (asp->nb_PlayerQuest * SAVED_QUEST_SLOT_SIZE)) {
 		LogError << "Truncated data";
 		free(dat);
 		return -1;
 	}
 	ARX_PLAYER_Quest_Init();
 	for(int i = 0; i < asp->nb_PlayerQuest; i++) {
-		ARX_PLAYER_Quest_Add(script::loadUnlocalized(boost::to_lower_copy(util::loadString(dat + pos, 80))), true);
-		pos += 80;
+		ARX_PLAYER_Quest_Add(script::loadUnlocalized(boost::to_lower_copy(util::loadString(dat + pos, SAVED_QUEST_SLOT_SIZE))));
+		pos += SAVED_QUEST_SLOT_SIZE;
 	}
 	
 	if(size < pos + (asp->keyring_nb * SAVED_KEYRING_SLOT_SIZE)) {
