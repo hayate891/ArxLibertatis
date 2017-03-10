@@ -492,9 +492,9 @@ static long ARX_NPC_GetNextAttainableNodeIncrement(Entity * io) {
 		phys.cyl = GetIOCyl(io);
 
 		// Now we try the physical move for real
-		if(io->physics.startpos == io->physics.targetpos
-		        || ((ARX_COLLISION_Move_Cylinder(&phys, io, 40, CFLAG_JUST_TEST | CFLAG_NPC))))
-		{
+		if(   io->physics.startpos == io->physics.targetpos
+		   || ARX_COLLISION_Move_Cylinder(&phys, io, 40, CFLAG_JUST_TEST | CFLAG_NPC)
+		) {
 			if(closerThan(phys.cyl.origin, ACTIVEBKG->anchors[pos].pos, 30.f)) {
 				return l_try;
 			}
@@ -510,7 +510,7 @@ static long ARX_NPC_GetNextAttainableNodeIncrement(Entity * io) {
 static long AnchorData_GetNearest(const Vec3f & pos, const Cylinder & cyl, long except = -1) {
 	long returnvalue = -1;
 	float distmax = std::numeric_limits<float>::max();
-	EERIE_BACKGROUND * eb = ACTIVEBKG;
+	BackgroundData * eb = ACTIVEBKG;
 
 	for(long i = 0; i < eb->nbanchors; i++) {
 		if(except != -1 && i == except)
@@ -625,12 +625,12 @@ bool ARX_NPC_LaunchPathfind(Entity * io, EntityHandle target)
 	io->_npcdata->pathfind.truetarget = target;
 	
 	if(   closerThan(pos1, ACTIVECAM->orgTrans.pos, ACTIVECAM->cdepth * 0.5f)
-	        &&	(glm::abs(pos1.y - pos2.y) < 50.f)
-	        && (closerThan(pos1, pos2, 520)) && (io->_npcdata->behavior & BEHAVIOUR_MOVE_TO)
-	        && (!(io->_npcdata->behavior & BEHAVIOUR_SNEAK))
-	        && (!(io->_npcdata->behavior & BEHAVIOUR_FLEE))
-	   )
-	{
+	   && glm::abs(pos1.y - pos2.y) < 50.f
+	   && closerThan(pos1, pos2, 520)
+	   && (io->_npcdata->behavior & BEHAVIOUR_MOVE_TO)
+	   && !(io->_npcdata->behavior & BEHAVIOUR_SNEAK)
+	   && !(io->_npcdata->behavior & BEHAVIOUR_FLEE)
+	) {
 		// COLLISION Management START *********************************************************************
 		io->physics.startpos = pos1;
 		io->physics.targetpos = pos2;
@@ -638,9 +638,9 @@ bool ARX_NPC_LaunchPathfind(Entity * io, EntityHandle target)
 		phys.cyl = GetIOCyl(io);
 
 		// Now we try the physical move for real
-		if(io->physics.startpos == io->physics.targetpos
-		        || ((ARX_COLLISION_Move_Cylinder(&phys, io, 40, CFLAG_JUST_TEST | CFLAG_NPC | CFLAG_NO_HEIGHT_MOD)) ))
-		{
+		if(   io->physics.startpos == io->physics.targetpos
+		   || ARX_COLLISION_Move_Cylinder(&phys, io, 40, CFLAG_JUST_TEST | CFLAG_NPC | CFLAG_NO_HEIGHT_MOD)
+		) {
 			if(closerThan(phys.cyl.origin, pos2, 100.f)) {
 				io->_npcdata->pathfind.pathwait = 0;
 				return false;
@@ -921,7 +921,7 @@ void ARX_PHYSICS_Apply() {
 
 		if(   (io->ioflags & IO_ITEM)
 		   && (io->gameFlags & GFLAG_GOREEXPLODE)
-		   && arxtime.now_f() - io->animBlend.lastanimtime > 300
+		   && arxtime.now_f() - toMs(io->animBlend.lastanimtime) > 300
 		   && io->obj
 		   && !io->obj->vertexlist.empty()
 		) {
@@ -1624,7 +1624,7 @@ static void ARX_NPC_Manage_Anims(Entity * io, float TOLERANCE) {
 				
 				ArxDuration elapsed = arxtime.now() - io->_npcdata->aiming_start;
 				ArxDuration aimtime = io->_npcdata->aimtime;
-				if((elapsed > aimtime || (elapsed > aimtime * 0.5f && Random::getf() > 0.9f))
+				if((elapsed > aimtime || (elapsed > ArxDurationMs(toMs(aimtime) * 0.5f) && Random::getf() > 0.9f))
 				    && tdist < square(STRIKE_DISTANCE)) {
 					changeAnimation(io, 1, strike);
 					SendIOScriptEvent(io, SM_STRIKE, "bare");
@@ -1725,7 +1725,7 @@ static void ARX_NPC_Manage_Anims(Entity * io, float TOLERANCE) {
 					
 					ArxDuration elapsed = arxtime.now() - io->_npcdata->aiming_start;
 					ArxDuration aimtime = io->_npcdata->aimtime;
-					if((elapsed > aimtime || (elapsed > aimtime * 0.5f && Random::getf() > 0.9f))
+					if((elapsed > aimtime || (elapsed > ArxDurationMs(toMs(aimtime) * 0.5f) && Random::getf() > 0.9f))
 					   && tdist < square(STRIKE_DISTANCE)) {
 						changeAnimation(io, 1, strike);
 						if(io->_npcdata->weapontype & OBJECT_TYPE_1H) {
@@ -2191,7 +2191,7 @@ static void ManageNPCMovement(Entity * io)
 			} else if(layer0.cur_anim == alist[ANIM_WALK] || layer0.cur_anim == alist[ANIM_RUN]
 			          || layer0.cur_anim == alist[ANIM_WALK_SNEAK]) {
 				layer0.flags &= ~EA_LOOP;
-				if(io->_npcdata->reachedtime + 500 < arxtime.now_f()) {
+				if(toMs(io->_npcdata->reachedtime + ArxDurationMs(500)) < arxtime.now_f()) {
 					changeAnimation(io, ANIM_DEFAULT, EA_LOOP, startAtBeginning);
 				}
 			}
@@ -2989,7 +2989,7 @@ void ManageIgnition_2(Entity * io) {
 	}
 }
 
-extern EERIE_BACKGROUND * ACTIVEBKG;
+extern BackgroundData * ACTIVEBKG;
 
 void GetTargetPos(Entity * io, unsigned long smoothing) {
 	

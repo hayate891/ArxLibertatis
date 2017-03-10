@@ -95,7 +95,14 @@ const bool
 	autoDescription = true,
 	forceToggle = false,
 	rawMouseInput = true,
-	borderTurning = true;
+	borderTurning = true,
+	useAltRuneRecognition = false;
+
+#ifdef ARX_DEBUG
+const bool allowConsole = true;
+#else
+const bool allowConsole = false;
+#endif
 
 const float
 	hudScale = 0.5f;
@@ -143,6 +150,7 @@ const ActionKey actions[NUM_ACTION_KEY] = {
 	ActionKey(Keyboard::Key_4), // CANCELCURSPELL
 	ActionKey(Keyboard::Key_R, Keyboard::Key_M), // MINIMAP
 	ActionKey((Keyboard::Key_LeftAlt << 16) | Keyboard::Key_Enter, (Keyboard::Key_RightAlt << 16) | Keyboard::Key_Enter), // TOGGLE_FULLSCREEN
+	ActionKey(Keyboard::Key_Grave), // CONSOLE
 };
 
 } // namespace Default
@@ -215,7 +223,9 @@ const std::string
 	mouseAcceleration = "mouse_acceleration",
 	rawMouseInput = "raw_mouse_input",
 	autoDescription = "auto_description",
-	borderTurning = "border_turning";
+	borderTurning = "border_turning",
+	useAltRuneRecognition = "use_alt_rune_recognition",
+	allowConsole = "allow_console";
 
 // Input key options
 const std::string actions[NUM_ACTION_KEY] = {
@@ -260,7 +270,8 @@ const std::string actions[NUM_ACTION_KEY] = {
 	"unequip_weapon",
 	"cancel_current_spell",
 	"minimap",
-	"toggle_fullscreen"
+	"toggle_fullscreen",
+	"console"
 };
 
 // Misc options
@@ -439,6 +450,11 @@ bool Config::save() {
 	writer.writeKey(Key::rawMouseInput, input.rawMouseInput);
 	writer.writeKey(Key::autoDescription, input.autoDescription);
 	writer.writeKey(Key::borderTurning, input.borderTurning);
+	writer.writeKey(Key::useAltRuneRecognition, input.useAltRuneRecognition);
+	if(input.allowConsole) {
+		// Only write this if true so that switching from release to debug builds enables the console
+		writer.writeKey(Key::allowConsole, input.allowConsole);
+	}
 	
 	// key
 	writer.beginSection(Section::Key);
@@ -565,6 +581,8 @@ bool Config::init(const fs::path & file) {
 	input.rawMouseInput = reader.getKey(Section::Input, Key::rawMouseInput, Default::rawMouseInput);
 	input.autoDescription = reader.getKey(Section::Input, Key::autoDescription, Default::autoDescription);
 	input.borderTurning = reader.getKey(Section::Input, Key::borderTurning, Default::borderTurning);
+	input.useAltRuneRecognition = reader.getKey(Section::Input, Key::useAltRuneRecognition, Default::useAltRuneRecognition);
+	input.allowConsole = reader.getKey(Section::Input, Key::allowConsole, Default::allowConsole);
 	
 	// Get action key settings
 	for(size_t i = 0; i < NUM_ACTION_KEY; i++) {

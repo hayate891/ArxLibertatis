@@ -61,10 +61,10 @@ extern bool DIRECT_PATH;
 
 static EERIEPOLY * ANCHOR_CheckInPolyPrecis(const Vec3f & pos) {
 	
-	long px = pos.x * ACTIVEBKG->Xmul;
-	long pz = pos.z * ACTIVEBKG->Zmul;
+	long px = pos.x * ACTIVEBKG->m_mul.x;
+	long pz = pos.z * ACTIVEBKG->m_mul.y;
 
-	if(px <= 0 || px >= ACTIVEBKG->Xsize - 1 || pz <= 0 || pz >= ACTIVEBKG->Zsize - 1)
+	if(px <= 0 || px >= ACTIVEBKG->m_size.x - 1 || pz <= 0 || pz >= ACTIVEBKG->m_size.y - 1)
 		return NULL;
 
 	EERIEPOLY * found = NULL;
@@ -72,7 +72,7 @@ static EERIEPOLY * ANCHOR_CheckInPolyPrecis(const Vec3f & pos) {
 
 	for(short z = pz - 1; z <= pz + 1; z++)
 	for(short x = px - 1; x <= px + 1; x++) {
-			EERIE_BKG_INFO *feg = &ACTIVEBKG->fastdata[x][z];
+			BackgroundTileData *feg = &ACTIVEBKG->m_tileData[x][z];
 
 			for(long k = 0; k < feg->nbpolyin; k++) {
 				EERIEPOLY *ep = feg->polyin[k];
@@ -94,15 +94,15 @@ static EERIEPOLY * ANCHOR_CheckInPolyPrecis(const Vec3f & pos) {
 
 static EERIEPOLY * ANCHOR_CheckInPoly(const Vec3f & pos) {
 	
-	long x = pos.x * ACTIVEBKG->Xmul;
-	long z = pos.z * ACTIVEBKG->Zmul;
+	long x = pos.x * ACTIVEBKG->m_mul.x;
+	long z = pos.z * ACTIVEBKG->m_mul.y;
 
-	if(x < 0 || x >= ACTIVEBKG->Xsize || z < 0 || z >= ACTIVEBKG->Zsize)
+	if(x < 0 || x >= ACTIVEBKG->m_size.x || z < 0 || z >= ACTIVEBKG->m_size.y)
 		return NULL;
 
 	EERIEPOLY *found = NULL;
 
-	EERIE_BKG_INFO *feg = &ACTIVEBKG->fastdata[x][z];
+	BackgroundTileData *feg = &ACTIVEBKG->m_tileData[x][z];
 
 	for(long k = 0; k < feg->nbpolyin; k++) {
 		EERIEPOLY *ep = feg->polyin[k];
@@ -220,16 +220,16 @@ static float ANCHOR_CheckAnythingInCylinder(const Cylinder & cyl, CollisionFlags
 	
 	ARX_PROFILE_FUNC();
 	
-	long rad = (cyl.radius + 230) * ACTIVEBKG->Xmul;
+	long rad = (cyl.radius + 230) * ACTIVEBKG->m_mul.x;
 	
-	long px = cyl.origin.x * ACTIVEBKG->Xmul;
-	long pz = cyl.origin.z * ACTIVEBKG->Zmul;
+	long px = cyl.origin.x * ACTIVEBKG->m_mul.x;
+	long pz = cyl.origin.z * ACTIVEBKG->m_mul.y;
 	
-	if(px > ACTIVEBKG->Xsize - 2 - rad)
+	if(px > ACTIVEBKG->m_size.x - 2 - rad)
 		return 0.f;
 	if(px < 1 + rad)
 		return 0.f;
-	if(pz > ACTIVEBKG->Zsize - 2 - rad)
+	if(pz > ACTIVEBKG->m_size.y - 2 - rad)
 		return 0.f;
 	if(pz < 1 + rad)
 		return 0.f;
@@ -238,7 +238,7 @@ static float ANCHOR_CheckAnythingInCylinder(const Cylinder & cyl, CollisionFlags
 	
 	for(short z = pz - rad; z <= pz + rad; z++)
 	for(short x = px - rad; x <= px + rad; x++) {
-		const EERIE_BKG_INFO & feg = ACTIVEBKG->fastdata[x][z];
+		const BackgroundTileData & feg = ACTIVEBKG->m_tileData[x][z];
 		
 		for(long k = 0; k < feg.nbpoly; k++) {
 			const EERIEPOLY & ep = feg.polydata[k];
@@ -515,14 +515,14 @@ static bool ANCHOR_ARX_COLLISION_Move_Cylinder(IO_PHYSICS * ip, Entity * io,
 	return true;
 }
 
-void AnchorData_ClearAll(EERIE_BACKGROUND * eb) {
+void AnchorData_ClearAll(BackgroundData * eb) {
 	
 	//	EERIE_PATHFINDER_Release();
 	EERIE_PATHFINDER_Clear();
 
-	for(long j = 0; j < eb->Zsize; j++) {
-		for(long i = 0; i < eb->Xsize; i++) {
-			EERIE_BKG_INFO * eg = &eb->fastdata[i][j];
+	for(long j = 0; j < eb->m_size.y; j++) {
+		for(long i = 0; i < eb->m_size.x; i++) {
+			BackgroundTileData * eg = &eb->m_tileData[i][j];
 
 			if(eg->nbianchors && eg->ianchors)
 				free(eg->ianchors);
@@ -589,7 +589,7 @@ bool CylinderAboveInvalidZone(const Cylinder & cyl) {
 // Adds an Anchor... and tries to generate the best possible cylinder for it
 //*************************************************************************************
 
-static bool DirectAddAnchor_Original_Method(EERIE_BACKGROUND * eb, EERIE_BKG_INFO * eg, Vec3f * pos) {
+static bool DirectAddAnchor_Original_Method(BackgroundData * eb, BackgroundTileData * eg, Vec3f * pos) {
 	
 	long found = 0;
 	long stop_radius = 0;
@@ -684,7 +684,7 @@ static bool DirectAddAnchor_Original_Method(EERIE_BACKGROUND * eb, EERIE_BKG_INF
 	return true;
 }
 
-static bool AddAnchor_Original_Method(EERIE_BACKGROUND * eb, EERIE_BKG_INFO * eg, Vec3f * pos) {
+static bool AddAnchor_Original_Method(BackgroundData * eb, BackgroundTileData * eg, Vec3f * pos) {
 	
 	long found = 0;
 	long best = 0;
@@ -806,7 +806,7 @@ static bool AddAnchor_Original_Method(EERIE_BACKGROUND * eb, EERIE_BKG_INFO * eg
 //**********************************************************************************************
 // Adds an Anchor Link to an Anchor
 //**********************************************************************************************
-static void AddAnchorLink(EERIE_BACKGROUND * eb, long anchor, long linked) {
+static void AddAnchorLink(BackgroundData * eb, long anchor, long linked) {
 	
 	ANCHOR_DATA & a = eb->anchors[anchor];
 	
@@ -826,16 +826,16 @@ static void AddAnchorLink(EERIE_BACKGROUND * eb, long anchor, long linked) {
 // Generates Links between Anchors for a background
 //**********************************************************************************************
 
-static void AnchorData_Create_Links_Original_Method(EERIE_BACKGROUND * eb) {
+static void AnchorData_Create_Links_Original_Method(BackgroundData * eb) {
 	
 	Vec3f p1, p2; 
 	long count = 0;
 	long per;
 	long lastper = -1;
-	long total = eb->Zsize * eb->Xsize;
+	long total = eb->m_size.y * eb->m_size.x;
 
-	for(long j = 0; j < eb->Zsize; j++)
-	for(long i = 0; i < eb->Xsize; i++) {
+	for(long j = 0; j < eb->m_size.y; j++)
+	for(long i = 0; i < eb->m_size.x; i++) {
 		per = count / total * 100.f;
 		
 		if(per != lastper) {
@@ -844,7 +844,7 @@ static void AnchorData_Create_Links_Original_Method(EERIE_BACKGROUND * eb) {
 		}
 		
 		count++;
-		const EERIE_BKG_INFO & eg = eb->fastdata[i][j];
+		const BackgroundTileData & eg = eb->m_tileData[i][j];
 		long precise = 0;
 		
 		for(long kkk = 0; kkk < eg.nbpolyin; kkk++) {
@@ -858,14 +858,14 @@ static void AnchorData_Create_Links_Original_Method(EERIE_BACKGROUND * eb) {
 		
 		
 		for(long k = 0; k < eg.nbianchors; k++) {
-			long ii = glm::clamp(i - 2, 0l, eb->Xsize - 1l);
-			long ia = glm::clamp(i + 2, 0l, eb->Xsize - 1l);
-			long ji = glm::clamp(j - 2, 0l, eb->Zsize - 1l);
-			long ja = glm::clamp(j + 2, 0l, eb->Zsize - 1l);
+			long ii = glm::clamp(i - 2, 0l, eb->m_size.x - 1l);
+			long ia = glm::clamp(i + 2, 0l, eb->m_size.x - 1l);
+			long ji = glm::clamp(j - 2, 0l, eb->m_size.y - 1l);
+			long ja = glm::clamp(j + 2, 0l, eb->m_size.y - 1l);
 			
 			for(long j2 = ji; j2 <= ja; j2++)
 			for(long i2 = ii; i2 <= ia; i2++) {
-				const EERIE_BKG_INFO & eg2 = eb->fastdata[i2][j2];
+				const BackgroundTileData & eg2 = eb->m_tileData[i2][j2];
 				long precise2 = 0;
 				
 				for(long kkk = 0; kkk < eg2.nbpolyin; kkk++) {
@@ -969,7 +969,7 @@ static void AnchorData_Create_Links_Original_Method(EERIE_BACKGROUND * eb) {
 
 static float GetTileMinY(long i, long j) {
 	float minf = 9999999999.f;
-	EERIE_BKG_INFO *eg = &ACTIVEBKG->fastdata[i][j];
+	BackgroundTileData *eg = &ACTIVEBKG->m_tileData[i][j];
 
 	for (long kk = 0; kk < eg->nbpolyin; kk++) {
 		EERIEPOLY * ep = eg->polyin[kk];
@@ -981,7 +981,7 @@ static float GetTileMinY(long i, long j) {
 
 static float GetTileMaxY(long i, long j) {
 	float maxf = -9999999999.f;
-	EERIE_BKG_INFO *eg = &ACTIVEBKG->fastdata[i][j];
+	BackgroundTileData *eg = &ACTIVEBKG->m_tileData[i][j];
 
 	for(long kk = 0; kk < eg->nbpolyin; kk++) {
 		EERIEPOLY * ep = eg->polyin[kk];
@@ -991,17 +991,17 @@ static float GetTileMaxY(long i, long j) {
 	return maxf;
 }
 
-static void AnchorData_Create_Phase_II_Original_Method(EERIE_BACKGROUND * eb) {
+static void AnchorData_Create_Phase_II_Original_Method(BackgroundData * eb) {
 	
 	Vec3f pos;
 	float count = 0;
 	
 	long lastper	=	-1;
 	long per;
-	float total		=	static_cast<float>(eb->Zsize * eb->Xsize);
+	float total		=	static_cast<float>(eb->m_size.y * eb->m_size.x);
 	
-	for(long z = 0; z < eb->Zsize; z++)
-	for(long x = 0; x < eb->Xsize; x++) {
+	for(long z = 0; z < eb->m_size.y; z++)
+	for(long x = 0; x < eb->m_size.x; x++) {
 		per = count / total * 100.f;
 		
 		if(per != lastper) {
@@ -1011,10 +1011,10 @@ static void AnchorData_Create_Phase_II_Original_Method(EERIE_BACKGROUND * eb) {
 		
 		count += 1.f;
 		
-		EERIE_BKG_INFO * eg = &eb->fastdata[x][z];
-		pos.x = float(x) * float(eb->Xdiv);
+		BackgroundTileData * eg = &eb->m_tileData[x][z];
+		pos.x = float(x) * float(eb->m_tileSize.x);
 		pos.y = 0.f;
-		pos.z = float(z) * float(eb->Zdiv);
+		pos.z = float(z) * float(eb->m_tileSize.y);
 		Cylinder currcyl = Cylinder(pos, 30, -150.f);
 		
 		if(eg->nbpolyin) {
@@ -1040,8 +1040,8 @@ static void AnchorData_Create_Phase_II_Original_Method(EERIE_BACKGROUND * eb) {
 				
 				for(float pposz = 0.f; pposz < 1.f; pposz += 0.1f)
 				for(float pposx = 0.f; pposx < 1.f; pposx += 0.1f) {
-					currcyl.origin.x = pos.x + pposx * eb->Xdiv;
-					currcyl.origin.z = pos.z + pposz * eb->Zdiv;
+					currcyl.origin.x = pos.x + pposx * eb->m_tileSize.x;
+					currcyl.origin.z = pos.z + pposz * eb->m_tileSize.y;
 					currcyl.origin.y = current_y;
 					
 					EERIEPOLY * ep2 = ANCHOR_CheckInPolyPrecis(currcyl.origin + Vec3f(0.f, -10.f, 0.f));
@@ -1084,7 +1084,7 @@ static void AnchorData_Create_Phase_II_Original_Method(EERIE_BACKGROUND * eb) {
 
 }
 
-void AnchorData_Create(EERIE_BACKGROUND * eb) {
+void AnchorData_Create(BackgroundData * eb) {
 	
 	AnchorData_ClearAll(eb);
 	Vec3f pos;
@@ -1092,10 +1092,10 @@ void AnchorData_Create(EERIE_BACKGROUND * eb) {
 	float count = 0;
 	long lastper	=	-1;
 	long per;
-	float total		=	static_cast<float>(eb->Zsize * eb->Xsize * 9);
+	float total		=	static_cast<float>(eb->m_size.y * eb->m_size.x * 9);
 
-	for(long z = 0; z < eb->Zsize; z++)
-	for(long x = 0; x < eb->Xsize; x++) {
+	for(long z = 0; z < eb->m_size.y; z++)
+	for(long x = 0; x < eb->m_size.x; x++) {
 		long LASTFOUND = 0;
 		
 		for(long divv = 0; divv < 9; divv++) {
@@ -1152,10 +1152,10 @@ void AnchorData_Create(EERIE_BACKGROUND * eb) {
 			if(LASTFOUND)
 				break;
 			
-			EERIE_BKG_INFO * eg = &eb->fastdata[x][z];
-			pos.x = (float)((float)((float)x + 0.33f * (float)divvx) * (float)eb->Xdiv);
+			BackgroundTileData * eg = &eb->m_tileData[x][z];
+			pos.x = (float)((float)((float)x + 0.33f * (float)divvx) * (float)eb->m_tileSize.x);
 			pos.y = 0.f;
-			pos.z = (float)((float)((float)z + 0.33f * (float)divvy) * (float)eb->Zdiv);
+			pos.z = (float)((float)((float)z + 0.33f * (float)divvy) * (float)eb->m_tileSize.y);
 			EERIEPOLY * ep = GetMinPoly(pos);
 			Cylinder currcyl = Cylinder(pos, 20 - (4.f * divv), -120.f);
 			

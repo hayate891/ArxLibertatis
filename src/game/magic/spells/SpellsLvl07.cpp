@@ -19,8 +19,6 @@
 
 #include "game/magic/spells/SpellsLvl07.h"
 
-#include <glm/gtc/random.hpp>
-
 #include "animation/AnimationRender.h"
 #include "core/Application.h"
 #include "core/Config.h"
@@ -37,6 +35,7 @@
 #include "graphics/particle/ParticleEffects.h"
 
 #include "gui/Interface.h"
+#include "math/RandomVector.h"
 
 #include "scene/GameSound.h"
 #include "scene/Interactive.h"
@@ -52,13 +51,15 @@ FlyingEyeSpell::FlyingEyeSpell()
 	
 }
 
-bool FlyingEyeSpell::CanLaunch()
-{
-	if(eyeball.exist)
+bool FlyingEyeSpell::CanLaunch() {
+	
+	if(eyeball.exist) {
 		return false;
+	}
 
-	if(spells.ExistAnyInstanceForThisCaster(m_type, m_caster))
+	if(spells.ExistAnyInstanceForThisCaster(m_type, m_caster)) {
 		return false;
+	}
 	
 	if(m_caster == EntityHandle_Player) {
 		m_target = EntityHandle_Player;
@@ -71,8 +72,8 @@ bool FlyingEyeSpell::CanLaunch()
 	return true;
 }
 
-void FlyingEyeSpell::Launch()
-{
+void FlyingEyeSpell::Launch() {
+	
 	static TextureContainer * tc4 = TextureContainer::Load("graph/particles/smoke");
 	
 	ARX_SOUND_PlaySFX(SND_SPELL_EYEBALL_IN);
@@ -96,8 +97,8 @@ void FlyingEyeSpell::Launch()
 			break;
 		}
 		
-		pd->ov = eyeball.pos + randomVec(-5.f, 5.f);
-		pd->move = randomVec(-2.f, 2.f);
+		pd->ov = eyeball.pos + arx::randomVec(-5.f, 5.f);
+		pd->move = arx::randomVec(-2.f, 2.f);
 		pd->siz = 28.f;
 		pd->tolive = Random::getu(2000, 6000);
 		pd->scale = Vec3f(12.f);
@@ -113,9 +114,12 @@ void FlyingEyeSpell::Launch()
 	config.input.mouseLookToggle = true;
 }
 
-void FlyingEyeSpell::End()
-{
-	ARX_SOUND_PlaySFX(SND_MAGIC_FIZZLE, &entities[m_caster]->pos);
+void FlyingEyeSpell::End() {
+	
+	Entity * caster = entities.get(m_caster);
+	if(caster) {
+		ARX_SOUND_PlaySFX(SND_MAGIC_FIZZLE, &caster->pos);
+	}
 	
 	static TextureContainer * tc4=TextureContainer::Load("graph/particles/smoke");
 	
@@ -129,8 +133,8 @@ void FlyingEyeSpell::End()
 			break;
 		}
 		
-		pd->ov = eyeball.pos + randomVec(-5.f, 5.f);
-		pd->move = randomVec(-2.f, 2.f);
+		pd->ov = eyeball.pos + arx::randomVec(-5.f, 5.f);
+		pd->move = arx::randomVec(-2.f, 2.f);
 		pd->siz = 28.f;
 		pd->tolive = Random::getu(2000, 6000);
 		pd->scale = Vec3f(12.f);
@@ -164,8 +168,8 @@ static void FlyingEyeSpellUpdateHand(const Vec3f & pos, LightHandle & light) {
 			break;
 		}
 		
-		pd->ov = pos + randomVec(-1.f, 1.f);
-		pd->move = Vec3f(0.1f, 0.f, 0.1f) + Vec3f(-0.2f, -2.2f, -0.2f) * randomVec3f();
+		pd->ov = pos + arx::randomVec(-1.f, 1.f);
+		pd->move = Vec3f(0.1f, 0.f, 0.1f) + Vec3f(-0.2f, -2.2f, -0.2f) * arx::randomVec3f();
 		pd->siz = 5.f;
 		pd->tolive = Random::getu(1500, 3500);
 		pd->scale = Vec3f(0.2f);
@@ -183,11 +187,11 @@ void FlyingEyeSpell::Update() {
 	
 	const ArxDuration framediff3 = now - m_lastupdate;
 	
-	eyeball.floating = std::sin(m_lastupdate - m_timcreation * 0.001f);
+	eyeball.floating = std::sin(toMs(m_lastupdate - m_timcreation) * 0.001f);
 	eyeball.floating *= 10.f;
 	
 	if(m_lastupdate - m_timcreation <= ArxDurationMs(3000)) {
-		eyeball.exist = m_lastupdate - m_timcreation * (1.0f / 30);
+		eyeball.exist = toMs(m_lastupdate - m_timcreation) * (1.0f / 30);
 		eyeball.size = Vec3f(1.f - float(eyeball.exist) * 0.01f);
 		eyeball.angle.setYaw(eyeball.angle.getYaw() + toMs(framediff3) * 0.6f);
 	} else {
@@ -238,8 +242,8 @@ void FireFieldSpell::Launch() {
 		beta = player.angle.getYaw();
 		displace = true;
 	} else {
-		if(ValidIONum(m_caster)) {
-			Entity * io = entities[m_caster];
+		Entity * io = entities.get(m_caster);
+		if(io) {
 			target = io->pos;
 			beta = io->angle.getYaw();
 			displace = (io->ioflags & IO_NPC) == IO_NPC;
@@ -271,11 +275,11 @@ void FireFieldSpell::Launch() {
 	
 	pPSStream1.SetParams(g_particleParameters[ParticleParam_FireFieldFlame]);
 	pPSStream1.SetPos(m_pos + Vec3f(0, 10, 0));
-	pPSStream1.Update(0);
+	pPSStream1.Update(ArxDuration_ZERO);
 }
 
-void FireFieldSpell::End()
-{
+void FireFieldSpell::End() {
+	
 	DamageRequestEnd(m_damage);
 	
 	ARX_SOUND_Stop(m_snd_loop);
@@ -284,8 +288,8 @@ void FireFieldSpell::End()
 
 void FireFieldSpell::Update() {
 	
-	pPSStream.Update(g_framedelay);
-	pPSStream1.Update(g_framedelay);
+	pPSStream.Update(ArxDurationMs(g_framedelay));
+	pPSStream1.Update(ArxDurationMs(g_framedelay));
 	
 	EERIE_LIGHT * el = dynLightCreate(m_light);
 	if(el) {
@@ -316,8 +320,8 @@ void FireFieldSpell::Update() {
 			float t = Random::getf() * (glm::pi<float>() * 2.f) - glm::pi<float>();
 			float ts = std::sin(t);
 			float tc = std::cos(t);
-			pd->ov = m_pos + Vec3f(120.f * ts, 15.f * ts, 120.f * tc) * randomVec();
-			pd->move = Vec3f(2.f, 1.f, 2.f) + Vec3f(-4.f, -8.f, -4.f) * randomVec3f();
+			pd->ov = m_pos + Vec3f(120.f * ts, 15.f * ts, 120.f * tc) * arx::randomVec();
+			pd->move = Vec3f(2.f, 1.f, 2.f) + Vec3f(-4.f, -8.f, -4.f) * arx::randomVec3f();
 			pd->siz = 7.f;
 			pd->tolive = Random::getu(500, 1500);
 			pd->tc = fire2;
@@ -350,8 +354,8 @@ IceFieldSpell::IceFieldSpell()
 	, tex_p2(NULL)
 {}
 
-void IceFieldSpell::Launch()
-{
+void IceFieldSpell::Launch() {
+	
 	spells.endByCaster(m_caster, SPELL_ICE_FIELD);
 	
 	ARX_SOUND_PlaySFX(SND_SPELL_ICE_FIELD);
@@ -369,8 +373,8 @@ void IceFieldSpell::Launch()
 		beta = player.angle.getYaw();
 		displace = true;
 	} else {
-		if(ValidIONum(m_caster)) {
-			Entity * io = entities[m_caster];
+		Entity * io = entities.get(m_caster);
+		if(io) {
 			target = io->pos;
 			beta = io->angle.getYaw();
 			displace = (io->ioflags & IO_NPC) == IO_NPC;
@@ -401,13 +405,14 @@ void IceFieldSpell::Launch()
 	for(int i = 0; i < iMax; i++) {
 		float t = Random::getf();
 
-		if (t < 0.5f)
+		if(t < 0.5f) {
 			tType[i] = 0;
-		else
+		} else {
 			tType[i] = 1;
+		}
 		
 		tSize[i] = Vec3f_ZERO;
-		tSizeMax[i] = randomVec3f() + Vec3f(0.f, 0.2f, 0.f);
+		tSizeMax[i] = arx::randomVec3f() + Vec3f(0.f, 0.2f, 0.f);
 		
 		Vec3f minPos;
 		if(tType[i] == 0) {
@@ -453,8 +458,9 @@ void IceFieldSpell::Update() {
 		el->extras=0;
 	}
 
-	if(!VisibleSphere(Sphere(m_pos - Vec3f(0.f, 120.f, 0.f), 350.f)))
+	if(!VisibleSphere(Sphere(m_pos - Vec3f(0.f, 120.f, 0.f), 350.f))) {
 		return;
+	}
 	
 	RenderMaterial mat;
 	mat.setDepthTest(true);
@@ -479,14 +485,17 @@ void IceFieldSpell::Update() {
 		stitecolor.g = tSizeMax[i].y * 0.7f;
 		stitecolor.b = tSizeMax[i].y * 0.9f;
 
-		if(stitecolor.r > 1)
+		if(stitecolor.r > 1) {
 			stitecolor.r = 1;
+		}
 
-		if(stitecolor.g > 1)
+		if(stitecolor.g > 1) {
 			stitecolor.g = 1;
+		}
 
-		if(stitecolor.b > 1)
+		if(stitecolor.b > 1) {
 			stitecolor.b = 1;
+		}
 
 		stitescale.z = tSize[i].x;
 		stitescale.y = tSize[i].y;
@@ -504,8 +513,8 @@ void IceFieldSpell::Update() {
 			
 			PARTICLE_DEF * pd = createParticle();
 			if(pd) {
-				pd->ov = tPos[i] + randomVec(-5.f, 5.f);
-				pd->move = randomVec(-2.f, 2.f);
+				pd->ov = tPos[i] + arx::randomVec(-5.f, 5.f);
+				pd->move = arx::randomVec(-2.f, 2.f);
 				pd->siz = 20.f;
 				pd->tolive = Random::getu(2000, 6000);
 				pd->tc = tex_p2;
@@ -518,7 +527,7 @@ void IceFieldSpell::Update() {
 			
 			PARTICLE_DEF * pd = createParticle();
 			if(pd) {
-				pd->ov = tPos[i] + randomVec(-5.f, 5.f) + Vec3f(0.f, 50.f, 0.f);
+				pd->ov = tPos[i] + arx::randomVec(-5.f, 5.f) + Vec3f(0.f, 50.f, 0.f);
 				pd->move = Vec3f(0.f, Random::getf(-2.f, 2.f), 0.f);
 				pd->siz = 0.5f;
 				pd->tolive = Random::getu(2000, 6000);
@@ -550,12 +559,15 @@ void LightningStrikeSpell::Launch() {
 	m_snd_loop = ARX_SOUND_PlaySFX(SND_SPELL_LIGHTNING_LOOP, &m_caster_pos, 1.f, ARX_SOUND_PLAY_LOOPED);
 }
 
-void LightningStrikeSpell::End()
-{
-	ARX_SOUND_PlaySFX(SND_SPELL_ELECTRIC, &entities[m_caster]->pos);
+void LightningStrikeSpell::End() {
 	
 	ARX_SOUND_Stop(m_snd_loop);
-	ARX_SOUND_PlaySFX(SND_SPELL_LIGHTNING_END, &entities[m_caster]->pos);
+	
+	Entity * caster = entities.get(m_caster);
+	if(caster) {
+		ARX_SOUND_PlaySFX(SND_SPELL_ELECTRIC, &caster->pos);
+		ARX_SOUND_PlaySFX(SND_SPELL_LIGHTNING_END, &caster->pos);
+	}
 }
 
 static Vec3f GetChestPos(EntityHandle num) {
@@ -563,14 +575,15 @@ static Vec3f GetChestPos(EntityHandle num) {
 	if(num == EntityHandle_Player) {
 		return player.pos + Vec3f(0.f, 70.f, 0.f);
 	}
-
-	if(ValidIONum(num)) {
-		ObjVertHandle idx = GetGroupOriginByName(entities[num]->obj, "chest");
+	
+	Entity * io = entities.get(num);
+	if(io) {
+		ObjVertHandle idx = GetGroupOriginByName(io->obj, "chest");
 
 		if(idx != ObjVertHandle()) {
-			return entities[num]->obj->vertexlist3[idx.handleData()].v;
+			return io->obj->vertexlist3[idx.handleData()].v;
 		} else {
-			return entities[num]->pos + Vec3f(0.f, -120.f, 0.f);
+			return io->pos + Vec3f(0.f, -120.f, 0.f);
 		}
 	} else {
 		// should not happen
@@ -699,7 +712,7 @@ void ConfuseSpell::Update() {
 			break;
 		}
 		
-		Vec2f p = glm::diskRand(15.f);
+		Vec2f p = arx::diskRand(15.f);
 		pd->ov = eCurPos + Vec3f(p.x, 0.f, p.y);
 		
 		pd->move = Vec3f(0.f, Random::getf(1.f, 4.f), 0.f);

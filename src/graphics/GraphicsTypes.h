@@ -430,9 +430,20 @@ struct EERIE_MULTI3DSCENE {
 //-------------------------------------------------------------------------
 //Portal Data;
 
+struct PortalPoly {
+	Vec3f		min;
+	Vec3f		max;
+	Vec3f		norm;
+	TexturedVertex		v[4];
+	Vec3f		center;
+	
+	PortalPoly()
+	{ }
+};
+
 struct EERIE_PORTALS
 {
-	EERIEPOLY	poly;
+	PortalPoly	poly;
 	size_t		room_1; // facing normal
 	size_t		room_2;
 	short		useportal;
@@ -440,7 +451,7 @@ struct EERIE_PORTALS
 };
 
 struct EP_DATA {
-	Vec2s p;
+	Vec2s tile;
 	short idx;
 	short padd;
 };

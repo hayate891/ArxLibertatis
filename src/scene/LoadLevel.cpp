@@ -104,7 +104,7 @@ extern bool bGCroucheToggle;
 long DanaeSaveLevel(const fs::path & _fic) {
 	
 	long nb_inter = GetNumberInterWithOutScriptLoad(); // Without Player
-	EERIE_BACKGROUND * eb = ACTIVEBKG;
+	BackgroundData * eb = ACTIVEBKG;
 	
 	fs::path fic = _fic;
 	fic.set_ext("dlf");
@@ -382,9 +382,9 @@ long DanaeSaveLevel(const fs::path & _fic) {
 	pos += sizeof(DANAE_LS_LIGHTINGHEADER);
 	
 	// TODO copy-paste poly iteration
-	for(short z = 0; z < eb->Zsize; z++)
-	for(short x = 0; x < eb->Xsize; x++) {
-		EERIE_BKG_INFO & eg = eb->fastdata[x][z];
+	for(short z = 0; z < eb->m_size.y; z++)
+	for(short x = 0; x < eb->m_size.x; x++) {
+		BackgroundTileData & eg = eb->m_tileData[x][z];
 		for(long l = 0; l < eg.nbpoly; l++) {
 			EERIEPOLY & ep = eg.polydata[l];
 			
@@ -583,8 +583,8 @@ bool DanaeLoadLevel(const res::path & file, bool loadEntities) {
 	}
 #if BUILD_EDIT_LOADSAVE
 	else if(mse != NULL) {
-		Mscenepos.x = -mse->cub.xmin - (mse->cub.xmax - mse->cub.xmin) * ( 1.0f / 2 ) + ((float)ACTIVEBKG->Xsize * (float)ACTIVEBKG->Xdiv) * ( 1.0f / 2 );
-		Mscenepos.z = -mse->cub.zmin - (mse->cub.zmax - mse->cub.zmin) * ( 1.0f / 2 ) + ((float)ACTIVEBKG->Zsize * (float)ACTIVEBKG->Zdiv) * ( 1.0f / 2 );
+		Mscenepos.x = -mse->cub.xmin - (mse->cub.xmax - mse->cub.xmin) * ( 1.0f / 2 ) + ((float)ACTIVEBKG->m_size.x * (float)ACTIVEBKG->m_tileSize.x) * ( 1.0f / 2 );
+		Mscenepos.z = -mse->cub.zmin - (mse->cub.zmax - mse->cub.zmin) * ( 1.0f / 2 ) + ((float)ACTIVEBKG->m_size.y * (float)ACTIVEBKG->m_tileSize.y) * ( 1.0f / 2 );
 		float t1 = (float)(long)(mse->point0.x / BKG_SIZX);
 		float t2 = (float)(long)(mse->point0.z / BKG_SIZZ);
 		t1 = mse->point0.x - t1 * BKG_SIZX;
@@ -964,7 +964,7 @@ void DanaeClearLevel(long flag)
 
 	EERIE_PATHFINDER_Release();
 
-	InitBkg(ACTIVEBKG, MAX_BKGX, MAX_BKGZ, BKG_SIZX, BKG_SIZZ);
+	InitBkg(ACTIVEBKG, MAX_BKGX, MAX_BKGZ, Vec2s(BKG_SIZX, BKG_SIZZ));
 	
 #if BUILD_EDIT_LOADSAVE
 	if(mse != NULL) {
@@ -997,7 +997,7 @@ void DanaeClearLevel(long flag)
 	FAST_RELEASE = 0;
 }
 
-void RestoreLastLoadedLightning(EERIE_BACKGROUND & eb)
+void RestoreLastLoadedLightning(BackgroundData & eb)
 {
 	long pos = 0;
 	long bcount = CountBkgVertex();
@@ -1018,9 +1018,9 @@ void RestoreLastLoadedLightning(EERIE_BACKGROUND & eb)
 	bcount = LastLoadedLightningNb;
 	
 	// TODO copy-paste poly iteration
-	for(short z = 0; z < eb.Zsize; z++)
-	for(short x = 0; x < eb.Xsize; x++) {
-		EERIE_BKG_INFO & eg = eb.fastdata[x][z];
+	for(short z = 0; z < eb.m_size.y; z++)
+	for(short x = 0; x < eb.m_size.x; x++) {
+		BackgroundTileData & eg = eb.m_tileData[x][z];
 		for(long l = 0; l < eg.nbpoly; l++) {
 			EERIEPOLY & ep = eg.polydata[l];
 			

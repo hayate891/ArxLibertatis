@@ -28,10 +28,12 @@
 #include "game/Player.h"
 #include "game/Spells.h"
 #include "game/effect/ParticleSystems.h"
+#include "graphics/Raycast.h"
 #include "graphics/effects/PolyBoom.h"
 #include "graphics/particle/Particle.h"
 #include "graphics/particle/ParticleEffects.h"
 #include "graphics/particle/ParticleParams.h"
+#include "math/RandomVector.h"
 #include "physics/Collisions.h"
 #include "scene/GameSound.h"
 #include "scene/Interactive.h"
@@ -46,8 +48,8 @@ SpeedSpell::~SpeedSpell() {
 	m_trails.clear();
 }
 
-void SpeedSpell::Launch()
-{
+void SpeedSpell::Launch() {
+	
 	m_hasDuration = true;
 	m_fManaCostPerSecond = 2.f;
 	
@@ -63,8 +65,9 @@ void SpeedSpell::Launch()
 	
 	m_duration = (m_launchDuration > ArxDuration(-1)) ? m_launchDuration : ArxDurationMs(20000);
 	
-	if(m_caster == EntityHandle_Player)
+	if(m_caster == EntityHandle_Player) {
 		m_duration = ArxDurationMs(200000000);
+	}
 	
 	std::vector<VertexGroup> & grouplist = entities[m_target]->obj->grouplist;
 	
@@ -98,7 +101,10 @@ void SpeedSpell::End() {
 	if(m_caster == EntityHandle_Player)
 		ARX_SOUND_Stop(m_snd_loop);
 	
-	ARX_SOUND_PlaySFX(SND_SPELL_SPEED_END, &entities[m_target]->pos);
+	Entity * target = entities.get(m_target);
+	if(target) {
+		ARX_SOUND_PlaySFX(SND_SPELL_SPEED_END, &target->pos);
+	}
 	
 	for(size_t i = 0; i < m_trails.size(); i++) {
 		delete m_trails[i].trail;
@@ -128,8 +134,8 @@ Vec3f SpeedSpell::getPosition() {
 }
 
 
-void DispellIllusionSpell::Launch()
-{
+void DispellIllusionSpell::Launch() {
+	
 	ARX_SOUND_PlaySFX(SND_SPELL_DISPELL_ILLUSION);
 	
 	m_duration = ArxDurationMs(1000);
@@ -146,9 +152,10 @@ void DispellIllusionSpell::Launch()
 		}
 		
 		if(spell->m_type == SPELL_INVISIBILITY) {
-			if(ValidIONum(spell->m_target) && ValidIONum(m_caster)) {
-				if(closerThan(entities[spell->m_target]->pos,
-				   entities[m_caster]->pos, 1000.f)) {
+			Entity * target = entities.get(spell->m_target);
+			Entity * caster = entities.get(m_caster);
+			if(target && caster) {
+				if(closerThan(target->pos, caster->pos, 1000.f)) {
 					spells.endSpell(spell);
 				}
 			}
@@ -164,9 +171,9 @@ void DispellIllusionSpell::Update() {
 
 FireballSpell::FireballSpell()
 	: SpellBase()
-	, ulCurrentTime(0)
+	, m_elapsed(ArxDuration_ZERO)
 	, bExplo(false)
-	, m_createBallDuration(2000)
+	, m_createBallDuration(ArxDurationMs(2000))
 {
 }
 
@@ -187,8 +194,9 @@ void FireballSpell::Launch() {
 		target = m_hand_pos;
 	} else {
 		target = m_caster_pos;
-		if(ValidIONum(m_caster)) {
-			Entity * c = entities[m_caster];
+		
+		Entity * c = entities.get(m_caster);
+		if(c) {
 			if(c->ioflags & IO_NPC) {
 				target += angleToVectorXZ(c->angle.getYaw()) * 30.f;
 				target += Vec3f(0.f, -80.f, 0.f);
@@ -235,9 +243,9 @@ void FireballSpell::End() {
 
 void FireballSpell::Update() {
 	
-	ulCurrentTime += g_framedelay;
+	m_elapsed += ArxDurationMs(g_framedelay);
 	
-	if(ulCurrentTime <= m_createBallDuration) {
+	if(m_elapsed <= m_createBallDuration) {
 		
 		float afAlpha = 0.f;
 		float afBeta = 0.f;
@@ -292,12 +300,12 @@ void FireballSpell::Update() {
 	
 	Sphere sphere = Sphere(eCurPos, std::max(m_level * 2.f, 12.f));
 	
-	if(ulCurrentTime > m_createBallDuration) {
+	if(m_elapsed > m_createBallDuration) {
 		SpawnFireballTail(eCurPos, eMove, m_level, 0);
 	} else {
 		if(Random::getf() < 0.9f) {
 			Vec3f move = Vec3f_ZERO;
-			float dd=(float)ulCurrentTime / (float)m_createBallDuration*10;
+			float dd = m_elapsed / m_createBallDuration * 10;
 			
 			dd = glm::clamp(dd, 1.f, m_level);
 			
@@ -335,15 +343,15 @@ Vec3f FireballSpell::getPosition() {
 
 CreateFoodSpell::CreateFoodSpell()
 	: SpellBase()
-	, m_currentTime(0)
+	, m_elapsed(ArxDuration_ZERO)
 {}
 
-void CreateFoodSpell::Launch()
-{
+void CreateFoodSpell::Launch() {
+	
 	ARX_SOUND_PlaySFX(SND_SPELL_CREATE_FOOD, &m_caster_pos);
 	
 	m_duration = (m_launchDuration > ArxDuration(-1)) ? m_launchDuration : ArxDurationMs(3500);
-	m_currentTime = 0;
+	m_elapsed = ArxDuration_ZERO;
 	
 	if(m_caster == EntityHandle_Player || m_target == EntityHandle_Player) {
 		player.hunger = 100;
@@ -362,13 +370,13 @@ void CreateFoodSpell::End() {
 
 void CreateFoodSpell::Update() {
 	
-	m_currentTime += g_framedelay;
+	m_elapsed += ArxDurationMs(g_framedelay);
 	
 	m_pos = entities.player()->pos;
 	
-	long ff = m_duration - m_currentTime;
+	ArxDuration ff = m_duration - m_elapsed;
 	
-	if(ff < 1500) {
+	if(ff < ArxDurationMs(1500)) {
 		m_particles.m_parameters.m_spawnFlags = PARTICLE_CIRCULAR;
 		m_particles.m_parameters.m_gravity = Vec3f_ZERO;
 		
@@ -388,7 +396,7 @@ void CreateFoodSpell::Update() {
 	}
 
 	m_particles.SetPos(m_pos);
-	m_particles.Update(g_framedelay);
+	m_particles.Update(ArxDurationMs(g_framedelay));
 	
 	m_particles.Render();
 }
@@ -396,7 +404,7 @@ void CreateFoodSpell::Update() {
 
 IceProjectileSpell::IceProjectileSpell()
 	: SpellBase()
-	, ulCurrentTime(0)
+	, m_elapsed(ArxDuration_ZERO)
 	, iNumber(0)
 	, iMax(0)
 	, fColor(0)
@@ -404,8 +412,8 @@ IceProjectileSpell::IceProjectileSpell()
 	, tex_p2(NULL)
 { }
 
-void IceProjectileSpell::Launch()
-{
+void IceProjectileSpell::Launch() {
+	
 	ARX_SOUND_PlaySFX(SND_SPELL_ICE_PROJECTILE_LAUNCH, &m_caster_pos);
 	
 	m_duration = ArxDurationMs(4200);
@@ -432,14 +440,14 @@ void IceProjectileSpell::Launch()
 	Vec3f s = target + Vec3f(0.f, -100.f, 0.f);
 	Vec3f e = s + angleToVectorXZ(angleb) * fspelldist;
 	
-	Vec3f h;
-	if(!Visible(s, e, &h)) {
-		e = h + angleToVectorXZ(angleb) * 20.f;
+	RaycastResult ray = RaycastLine(s, e);
+	if(ray.hit) {
+		e = ray.pos + angleToVectorXZ(angleb) * 20.f;
 	}
 
 	float fd = fdist(s, e);
 
-	float fCalc = m_duration * (fd / fspelldist);
+	float fCalc = toMs(m_duration) * (fd / fspelldist);
 	m_duration = ArxDurationMs(checked_range_cast<unsigned long>(fCalc));
 
 	float fDist = (fd / fspelldist) * iMax ;
@@ -473,11 +481,11 @@ void IceProjectileSpell::Launch()
 		}
 
 		icicle.size = Vec3f_ZERO;
-		icicle.sizeMax = randomVec() + Vec3f(0.f, 0.2f, 0.f);
+		icicle.sizeMax = arx::randomVec() + Vec3f(0.f, 0.2f, 0.f);
 		icicle.sizeMax = glm::max(icicle.sizeMax, minSize);
 		
 		int iNum = static_cast<int>(i / 2);
-		icicle.pos = tv1a[iNum] + randomOffsetXZ(randomRange);
+		icicle.pos = tv1a[iNum] + arx::randomOffsetXZ(randomRange);
 		
 		DamageParameters damage;
 		damage.pos = icicle.pos;
@@ -497,12 +505,12 @@ void IceProjectileSpell::End() {
 }
 
 void IceProjectileSpell::Update() {
+	
+	m_elapsed += ArxDurationMs(g_framedelay);
 
-	ulCurrentTime += g_framedelay;
-
-	if(m_duration - ulCurrentTime < 1000) {
-		fColor = (m_duration - ulCurrentTime) * ( 1.0f / 1000 );
-
+	if(m_duration - m_elapsed < ArxDurationMs(1000)) {
+		fColor = toMs(m_duration - m_elapsed) * ( 1.0f / 1000 );
+		
 		for(int i = 0; i < iNumber; i++) {
 			m_icicles[i].size.y *= fColor;
 		}
@@ -513,11 +521,12 @@ void IceProjectileSpell::Update() {
 	mat.setDepthTest(true);
 	mat.setBlendType(RenderMaterial::Screen);
 	
-	float fOneOnDuration = 1.f / (float)(m_duration);
-	iMax = (int)((iNumber * 2) * fOneOnDuration * ulCurrentTime);
+	float fOneOnDuration = 1.f / toMs(m_duration);
+	iMax = (int)((iNumber * 2) * fOneOnDuration * toMs(m_elapsed));
 
-	if(iMax > iNumber)
+	if(iMax > iNumber) {
 		iMax = iNumber;
+	}
 
 	for(int i = 0; i < iMax; i++) {
 		Icicle & icicle = m_icicles[i];
@@ -547,11 +556,11 @@ void IceProjectileSpell::Update() {
 			
 			PARTICLE_DEF * pd = createParticle();
 			if(pd) {
-				pd->ov = icicle.pos + randomVec(-5.f, 5.f);
-				pd->move = randomVec(-2.f, 2.f);
+				pd->ov = icicle.pos + arx::randomVec(-5.f, 5.f);
+				pd->move = arx::randomVec(-2.f, 2.f);
 				pd->siz = 20.f;
 				float t = std::min(Random::getf(2000.f, 4000.f),
-				              m_duration - ulCurrentTime + Random::getf(0.f, 500.0f));
+				                   toMs(m_duration - m_elapsed) + Random::getf(0.f, 500.0f));
 				pd->tolive = checked_range_cast<u32>(t);
 				pd->tc = tex_p2;
 				pd->m_flags = FADE_IN_AND_OUT | ROTATING | DISSIPATING;
@@ -563,18 +572,17 @@ void IceProjectileSpell::Update() {
 			
 			PARTICLE_DEF * pd = createParticle();
 			if(pd) {
-				pd->ov = icicle.pos + randomVec(-5.f, 5.f) - Vec3f(0.f, 50.f, 0.f);
+				pd->ov = icicle.pos + arx::randomVec(-5.f, 5.f) - Vec3f(0.f, 50.f, 0.f);
 				pd->move = Vec3f(0.f, Random::getf(-2.f, 2.f), 0.f);
 				pd->siz = 0.5f;
 				float t = std::min(Random::getf(2000.f, 3000.f),
-				              m_duration - ulCurrentTime + Random::getf(0.f, 500.0f));
+				              toMs(m_duration - m_elapsed) + Random::getf(0.f, 500.0f));
 				pd->tolive = checked_range_cast<u32>(t);
 				pd->tc = tex_p1;
 				pd->m_flags = FADE_IN_AND_OUT | ROTATING | DISSIPATING;
 				pd->m_rotation = 0.0000001f;
 				pd->rgb = Color3f(0.7f, 0.7f, 1.f);
 			}
-			
 		}
 	}
 }

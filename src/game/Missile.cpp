@@ -55,11 +55,13 @@ ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 #include "graphics/Color.h"
 #include "graphics/GraphicsTypes.h"
 #include "graphics/Math.h"
+#include "graphics/Raycast.h"
 #include "graphics/data/Mesh.h"
 #include "graphics/effects/PolyBoom.h"
 #include "graphics/particle/ParticleEffects.h"
 
 #include "math/Random.h"
+#include "math/RandomVector.h"
 #include "math/Vector.h"
 
 #include "platform/profiler/Profiler.h"
@@ -185,7 +187,7 @@ void ARX_MISSILES_Update() {
 
 		ArxDuration framediff = missiles[i].timecreation + missiles[i].tolive - now;
 
-		if(framediff < 0) {
+		if(framediff < ArxDuration_ZERO) {
 			ARX_MISSILES_Kill(i);
 			continue;
 		}
@@ -198,7 +200,7 @@ void ARX_MISSILES_Update() {
 			case MISSILE_FIREBALL: {
 				Vec3f pos;
 
-				pos = missiles[i].startpos + missiles[i].velocity * Vec3f(framediff3);
+				pos = missiles[i].startpos + missiles[i].velocity * Vec3f(toMs(framediff3));
 				
 				EERIE_LIGHT * light = lightHandleGet(missiles[i].m_light);
 				if(light) {
@@ -208,60 +210,31 @@ void ARX_MISSILES_Update() {
 				Vec3f orgn = missiles[i].lastpos;
 				Vec3f dest = pos;
 				
-				Vec3f tro = Vec3f(70.f);
-				
 				EERIEPOLY *ep = GetMinPoly(dest);
 				EERIEPOLY *epp = GetMaxPoly(dest);
-
-				if(closerThan(player.pos, pos, 200.f)) {
-					ARX_MISSILES_Kill(i);
-					spawnFireHitParticle(pos, 0);
-					PolyBoomAddScorch(pos);
-					Add3DBoom(pos);
-					DoSphericDamage(Sphere(dest, 200.0F), 180.0F, DAMAGE_AREAHALF, DAMAGE_TYPE_FIRE | DAMAGE_TYPE_MAGICAL, EntityHandle());
-					break;
+				
+				bool hit = false;
+				
+				if(closerThan(player.pos, dest, 200.f) || (ep && ep->center.y < dest.y) || (epp && epp->center.y > dest.y)) {
+					hit = true;
+				} else {
+					RaycastResult ray = RaycastLine(orgn, dest);
+					if(ray.hit) {
+						dest = ray.pos;
+						hit = true;
+					} else if(!CheckInPoly(dest) || EEIsUnderWater(dest)) {
+						hit = true;
+					} else {
+						Vec3f tro = Vec3f(70.f);
+						EntityHandle ici = IsCollidingAnyInter(dest, tro);
+						
+						if(ici != EntityHandle() && ici != missiles[i].owner) {
+							hit = true;
+						}
+					}
 				}
-
-				if(ep && ep->center.y < dest.y) {
-					ARX_MISSILES_Kill(i);
-					spawnFireHitParticle(dest, 0);
-					PolyBoomAddScorch(dest);
-					Add3DBoom(dest);
-					DoSphericDamage(Sphere(dest, 200.0F), 180.0F, DAMAGE_AREAHALF, DAMAGE_TYPE_FIRE | DAMAGE_TYPE_MAGICAL, EntityHandle());
-					break;
-				}
-
-				if(epp && epp->center.y > dest.y) {
-					ARX_MISSILES_Kill(i);
-					spawnFireHitParticle(dest, 0);
-					PolyBoomAddScorch(dest);
-					Add3DBoom(dest);
-					DoSphericDamage(Sphere(dest, 200.0F), 180.0F, DAMAGE_AREAHALF, DAMAGE_TYPE_FIRE | DAMAGE_TYPE_MAGICAL, EntityHandle());
-					break;
-				}
-
-				Vec3f hit;
-				if(EERIELaunchRay3(orgn, dest, hit, 1)) {
-					ARX_MISSILES_Kill(i);
-					spawnFireHitParticle(hit, 0);
-					PolyBoomAddScorch(hit);
-					Add3DBoom(hit);
-					DoSphericDamage(Sphere(dest, 200.0F), 180.0F, DAMAGE_AREAHALF, DAMAGE_TYPE_FIRE | DAMAGE_TYPE_MAGICAL, EntityHandle());
-					break;
-				}
-
-				if(!CheckInPoly(dest) || EEIsUnderWater(dest)) {
-					ARX_MISSILES_Kill(i);
-					spawnFireHitParticle(dest, 0);
-					PolyBoomAddScorch(dest);
-					Add3DBoom(dest);
-					DoSphericDamage(Sphere(dest, 200.0F), 180.0F, DAMAGE_AREAHALF, DAMAGE_TYPE_FIRE | DAMAGE_TYPE_MAGICAL, EntityHandle());
-					break;
-				}
-
-				EntityHandle ici = IsCollidingAnyInter(dest, tro);
-
-				if(ici != EntityHandle() && ici != missiles[i].owner) {
+				
+				if(hit) {
 					ARX_MISSILES_Kill(i);
 					spawnFireHitParticle(dest, 0);
 					PolyBoomAddScorch(dest);
@@ -274,11 +247,11 @@ void ARX_MISSILES_Update() {
 				if(pd) {
 					pd->ov = pos;
 					pd->move = missiles[i].velocity;
-					pd->move += Vec3f(3.f, 4.f, 3.f) + Vec3f(-6.f, -12.f, -6.f) * randomVec3f();
+					pd->move += Vec3f(3.f, 4.f, 3.f) + Vec3f(-6.f, -12.f, -6.f) * arx::randomVec3f();
 					pd->tolive = Random::getu(500, 1000);
 					pd->tc = tc;
-					pd->siz = 12.f * float(missiles[i].tolive - framediff3) * (1.f / 4000);
-					pd->scale = randomVec(15.f, 20.f);
+					pd->siz = 12.f * toMs(missiles[i].tolive - framediff3) * (1.f / 4000);
+					pd->scale = arx::randomVec(15.f, 20.f);
 					pd->m_flags = FIRE_TO_SMOKE;
 				}
 				

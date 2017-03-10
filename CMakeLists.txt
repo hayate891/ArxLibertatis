@@ -850,6 +850,7 @@ set(GRAPHICS_SOURCES
 	src/graphics/DrawDebug.cpp
 	src/graphics/GraphicsModes.cpp
 	src/graphics/Math.cpp
+	src/graphics/Raycast.cpp
 	src/graphics/Renderer.cpp
 	src/graphics/RenderBatcher.cpp
 	src/graphics/data/FTL.cpp
@@ -859,6 +860,7 @@ set(GRAPHICS_SOURCES
 	src/graphics/data/Progressive.cpp
 	src/graphics/data/TextureContainer.cpp
 	src/graphics/effects/BlobShadow.cpp
+	src/graphics/effects/Cabal.cpp
 	src/graphics/effects/Fade.cpp
 	src/graphics/effects/Field.cpp
 	src/graphics/effects/Fissure.cpp
@@ -900,6 +902,7 @@ set(GRAPHICS_OPENGL_SOURCES
 
 set(GUI_SOURCES
 	src/gui/CinematicBorder.cpp
+	src/gui/Console.cpp
 	src/gui/Credits.cpp
 	src/gui/Cursor.cpp
 	src/gui/DebugHud.cpp
@@ -933,7 +936,10 @@ set(GUI_SOURCES
 	src/gui/widget/WidgetContainer.cpp
 )
 
-set(INPUT_SOURCES src/input/Input.cpp)
+set(INPUT_SOURCES
+	src/input/Input.cpp
+	src/input/TextInput.cpp
+)
 set(INPUT_SDL1_SOURCES src/input/SDL1InputBackend.cpp)
 set(INPUT_SDL2_SOURCES src/input/SDL2InputBackend.cpp)
 

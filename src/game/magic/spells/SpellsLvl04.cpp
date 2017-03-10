@@ -32,7 +32,7 @@
 #include "game/magic/spells/SpellsLvl07.h"
 #include "gui/Speech.h"
 #include "graphics/particle/ParticleEffects.h"
-
+#include "math/RandomVector.h"
 #include "scene/GameSound.h"
 #include "scene/Interactive.h"
 
@@ -47,13 +47,13 @@ BlessSpell::BlessSpell()
 	, fRot(0)
 { }
 
-bool BlessSpell::CanLaunch()
-{
+bool BlessSpell::CanLaunch() {
+	
 	return !spells.ExistAnyInstanceForThisCaster(m_type, m_caster);
 }
 
-void BlessSpell::Launch()
-{
+void BlessSpell::Launch() {
+	
 	if(m_caster == EntityHandle_Player) {
 		m_target = EntityHandle_Player;
 	}
@@ -89,13 +89,14 @@ void BlessSpell::Update() {
 	
 	fRot += g_framedelay * 0.25f;
 	
-	if(ValidIONum(m_target)) {
-		m_pos = entities[m_target]->pos;
+	Entity * target = entities.get(m_target);
+	if(target) {
+		m_pos = target->pos;
 		
 		if(m_target == EntityHandle_Player)
 			m_yaw = player.angle.getYaw();
 		else 
-			m_yaw = entities[m_target]->angle.getYaw();
+			m_yaw = target->angle.getYaw();
 	}
 	
 	m_scale = (m_level + 10) * 6.f;
@@ -151,7 +152,7 @@ void BlessSpell::Update() {
 		}
 		
 		pd->ov = m_pos - Vec3f(0.f, 20.f, 0.f);
-		pd->move = Vec3f(Random::getf(-3.f, 3.f), Random::getf(0.f, 0.5f), Random::getf(-3.f, 3.f));
+		pd->move = arx::linearRand(Vec3f(-3.f, 0.f, -3.f), Vec3f(3.f, 0.5f, 3.f));
 		pd->siz = 0.005f;
 		pd->tolive = Random::getu(1000, 2000);
 		pd->tc = tex_p1;
@@ -165,8 +166,8 @@ Vec3f BlessSpell::getPosition() {
 	return getTargetPosition();
 }
 
-void DispellFieldSpell::Launch()
-{
+void DispellFieldSpell::Launch() {
+	
 	m_duration = ArxDurationMs(10);
 	
 	long valid = 0, dispelled = 0;
@@ -230,8 +231,8 @@ void DispellFieldSpell::Launch()
 }
 
 
-void FireProtectionSpell::Launch()
-{
+void FireProtectionSpell::Launch() {
+	
 	spells.endByTarget(m_target, SPELL_FIRE_PROTECTION);
 	spells.endByCaster(m_caster, SPELL_ARMOR);
 	spells.endByCaster(m_caster, SPELL_LOWER_ARMOR);
@@ -239,8 +240,9 @@ void FireProtectionSpell::Launch()
 	
 	m_duration = (m_launchDuration > ArxDuration(-1)) ? m_launchDuration : ArxDurationMs(20000);
 	
-	if(m_caster == EntityHandle_Player)
+	if(m_caster == EntityHandle_Player) {
 		m_duration = ArxDurationMs(2000000);
+	}
 	
 	if(m_caster == EntityHandle_Player) {
 		m_target = EntityHandle_Player;
@@ -251,8 +253,8 @@ void FireProtectionSpell::Launch()
 	m_hasDuration = true;
 	m_fManaCostPerSecond = 1.f;
 	
-	if(ValidIONum(m_target)) {
-		Entity *io = entities[m_target];
+	Entity * io = entities.get(m_target);
+	if(io) {
 		io->halo.flags = HALO_ACTIVE;
 		io->halo.color = Color3f(0.5f, 0.3f, 0.f);
 		io->halo.radius = 45.f;
@@ -263,34 +265,37 @@ void FireProtectionSpell::Launch()
 	m_snd_loop = ARX_SOUND_PlaySFX(SND_SPELL_FIRE_PROTECTION_LOOP, &entities[m_target]->pos, 1.f, ARX_SOUND_PLAY_LOOPED);
 }
 
-void FireProtectionSpell::End()
-{
-	ARX_SOUND_Stop(m_snd_loop);
-	ARX_SOUND_PlaySFX(SND_SPELL_FIRE_PROTECTION_END, &entities[m_target]->pos);
-	m_targets.clear();
+void FireProtectionSpell::End() {
 	
-	if(ValidIONum(m_target))
-		ARX_HALO_SetToNative(entities[m_target]);
+	ARX_SOUND_Stop(m_snd_loop);
+	
+	Entity * target = entities.get(m_target);
+	if(target) {
+		ARX_SOUND_PlaySFX(SND_SPELL_FIRE_PROTECTION_END, &target->pos);
+		ARX_HALO_SetToNative(target);
+	}
+	
+	m_targets.clear();
 }
 
 void FireProtectionSpell::Update() {
 	
-	if(ValidIONum(m_target)) {
-		Entity *io = entities[m_target];
+	Entity * io = entities.get(m_target);
+	if(io) {
 		io->halo.flags = HALO_ACTIVE;
 		io->halo.color = Color3f(0.5f, 0.3f, 0.f);
 		io->halo.radius = 45.f;
+		
+		ARX_SOUND_RefreshPosition(m_snd_loop, io->pos);
 	}
-	
-	ARX_SOUND_RefreshPosition(m_snd_loop, entities[m_target]->pos);
 }
 
 Vec3f FireProtectionSpell::getPosition() {
 	return getTargetPosition();
 }
 
-void ColdProtectionSpell::Launch()
-{
+void ColdProtectionSpell::Launch() {
+	
 	spells.endByTarget(m_target, SPELL_COLD_PROTECTION);
 	spells.endByCaster(m_caster, SPELL_ARMOR);
 	spells.endByCaster(m_caster, SPELL_LOWER_ARMOR);
@@ -304,14 +309,15 @@ void ColdProtectionSpell::Launch()
 	
 	m_duration = (m_launchDuration > ArxDuration(-1)) ? m_launchDuration : ArxDurationMs(20000);
 	
-	if(m_caster == EntityHandle_Player)
+	if(m_caster == EntityHandle_Player) {
 		m_duration = ArxDurationMs(2000000);
+	}
 	
 	m_hasDuration = true;
 	m_fManaCostPerSecond = 1.f;
 	
-	if(ValidIONum(m_target)) {
-		Entity *io = entities[m_target];
+	Entity * io = entities.get(m_target);
+	if(io) {
 		io->halo.flags = HALO_ACTIVE;
 		io->halo.color = Color3f(0.2f, 0.2f, 0.45f);
 		io->halo.radius = 45.f;
@@ -322,39 +328,43 @@ void ColdProtectionSpell::Launch()
 	m_targets.push_back(m_target);
 }
 
-void ColdProtectionSpell::End()
-{
-	ARX_SOUND_Stop(m_snd_loop);
-	ARX_SOUND_PlaySFX(SND_SPELL_COLD_PROTECTION_END, &entities[m_target]->pos);
-	m_targets.clear();
+void ColdProtectionSpell::End() {
 	
-	if(ValidIONum(m_target))
-		ARX_HALO_SetToNative(entities[m_target]);
+	ARX_SOUND_Stop(m_snd_loop);
+	
+	Entity * target = entities.get(m_target);
+	if(target) {
+		ARX_SOUND_PlaySFX(SND_SPELL_COLD_PROTECTION_END, &target->pos);
+		ARX_HALO_SetToNative(target);
+	}
+	
+	m_targets.clear();
 }
 
 void ColdProtectionSpell::Update() {
 	
-	if(ValidIONum(m_target)) {
-		Entity *io = entities[m_target];
+	Entity * io = entities.get(m_target);
+	if(io) {
 		io->halo.flags = HALO_ACTIVE;
 		io->halo.color = Color3f(0.2f, 0.2f, 0.45f);
 		io->halo.radius = 45.f;
+		
+		ARX_SOUND_RefreshPosition(m_snd_loop, io->pos);
 	}
-	
-	ARX_SOUND_RefreshPosition(m_snd_loop, entities[m_target]->pos);
 }
 
 Vec3f ColdProtectionSpell::getPosition() {
+	
 	return getTargetPosition();
 }
 
-bool TelekinesisSpell::CanLaunch()
-{
+bool TelekinesisSpell::CanLaunch() {
+	
 	return !spells.ExistAnyInstanceForThisCaster(m_type, m_caster);
 }
 
-void TelekinesisSpell::Launch()
-{
+void TelekinesisSpell::Launch() {
+	
 	m_duration = (m_launchDuration > ArxDuration(-1)) ? m_launchDuration : ArxDurationMs(6000000);
 	m_hasDuration = true;
 	m_fManaCostPerSecond = 0.9f;
@@ -366,12 +376,15 @@ void TelekinesisSpell::Launch()
 	ARX_SOUND_PlaySFX(SND_SPELL_TELEKINESIS_START, &m_caster_pos);
 }
 
-void TelekinesisSpell::End()
-{
+void TelekinesisSpell::End() {
+	
 	if(m_caster == EntityHandle_Player)
 		player.m_telekinesis = false;
 	
-	ARX_SOUND_PlaySFX(SND_SPELL_TELEKINESIS_END, &entities[m_caster]->pos);
+	Entity * caster = entities.get(m_caster);
+	if(caster) {
+		ARX_SOUND_PlaySFX(SND_SPELL_TELEKINESIS_END, &caster->pos);
+	}
 }
 
 
@@ -382,8 +395,8 @@ CurseSpell::CurseSpell()
 	, fRot(0.f)
 {}
 
-void CurseSpell::Launch()
-{
+void CurseSpell::Launch() {
+	
 	spells.endByCaster(m_target, SPELL_CURSE);
 	
 	ARX_SOUND_PlaySFX(SND_SPELL_CURSE, &entities[m_target]->pos);
@@ -395,8 +408,8 @@ void CurseSpell::Launch()
 	Vec3f target = getTargetPos(m_caster, m_target);
 	if(m_target == EntityHandle_Player) {
 		target.y -= 200.f;
-	} else if(ValidIONum(m_target)) {
-		target.y += entities[m_target]->physics.cyl.height - 50.f;
+	} else if(Entity * targetIo = entities.get(m_target)) {
+		target.y += targetIo->physics.cyl.height - 50.f;
 	}
 	
 	m_pos = target;
@@ -416,13 +429,15 @@ void CurseSpell::Update() {
 	fRot += g_framedelay * 0.25f;
 	
 	Vec3f target = Vec3f_ZERO;
-	if(ValidIONum(m_target)) {
-		target = entities[m_target]->pos;
+	
+	Entity * targetIo = entities.get(m_target);
+	if(targetIo) {
+		target = targetIo->pos;
 
 		if(m_target == EntityHandle_Player)
 			target.y -= 200.f;
 		else
-			target.y += entities[m_target]->physics.cyl.height - 30.f;
+			target.y += targetIo->physics.cyl.height - 30.f;
 	}
 	m_pos = target;
 	
@@ -441,7 +456,7 @@ void CurseSpell::Update() {
 		}
 		
 		pd->ov = m_pos;
-		pd->move = Vec3f(Random::getf(-2.f, 2.f), Random::getf(-20.f, -10.f), Random::getf(-2.f, 2.f));
+		pd->move = arx::linearRand(Vec3f(-2.f, -20.f, -2.f), Vec3f(2.f, -10.f, 2.f));
 		pd->siz = 0.015f;
 		pd->tolive = Random::getu(1000, 1600);
 		pd->tc = tex_p1;

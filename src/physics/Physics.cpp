@@ -202,9 +202,8 @@ static bool IsObjectInField(PHYSICS_BOX_DATA * pbox) {
 		if(spell && spell->m_type == SPELL_CREATE_FIELD) {
 			const CreateFieldSpell * sp = static_cast<const CreateFieldSpell *>(spell);
 			
-			if(ValidIONum(sp->m_entity)) {
-				Entity * pfrm = entities[sp->m_entity];
-				
+			Entity * pfrm = entities.get(sp->m_entity);
+			if(pfrm) {
 				Cylinder cyl = Cylinder(Vec3f_ZERO, 35.f, -35.f);
 				
 				for(long k = 0; k < pbox->nb_physvert; k++) {
@@ -266,18 +265,18 @@ static bool IsFULLObjectVertexInValidPosition(PHYSICS_BOX_DATA * pbox, EERIEPOLY
 	float rad = pbox->radius;
 	
 	// TODO copy-paste background tiles
-	int tilex = int(pbox->vert[0].pos.x * ACTIVEBKG->Xmul);
-	int tilez = int(pbox->vert[0].pos.z * ACTIVEBKG->Zmul);
+	int tilex = int(pbox->vert[0].pos.x * ACTIVEBKG->m_mul.x);
+	int tilez = int(pbox->vert[0].pos.z * ACTIVEBKG->m_mul.y);
 	int radius = std::min(1, short(rad * (1.0f/100)) + 1);
 	
 	int minx = std::max(tilex - radius, 0);
-	int maxx = std::min(tilex + radius, ACTIVEBKG->Xsize - 1);
+	int maxx = std::min(tilex + radius, ACTIVEBKG->m_size.x - 1);
 	int minz = std::max(tilez - radius, 0);
-	int maxz = std::min(tilez + radius, ACTIVEBKG->Zsize - 1);
+	int maxz = std::min(tilez + radius, ACTIVEBKG->m_size.y - 1);
 	
 	for(int z = minz; z <= maxz; z++)
 	for(int x = minx; x <= maxx; x++) {
-		EERIE_BKG_INFO & eg = ACTIVEBKG->fastdata[x][z];
+		BackgroundTileData & eg = ACTIVEBKG->m_tileData[x][z];
 		
 		for(long k = 0; k < eg.nbpoly; k++) {
 			EERIEPOLY & ep = eg.polydata[k];

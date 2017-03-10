@@ -22,6 +22,7 @@
 #include "core/Application.h"
 #include "core/Config.h"
 #include "core/Core.h"
+#include "core/GameTime.h"
 #include "game/Inventory.h"
 #include "game/Item.h"
 #include "game/Player.h"
@@ -170,15 +171,19 @@ void SecondaryInventoryHud::update() {
 		// Pick All/Close Secondary Inventory
 		if(TSecondaryInventory) {
 			//These have to be calculated on each frame (to make them move).
-			Rectf parent = Rectf(Vec2f(m_fadePosition, 0), m_defaultBackground->m_size.x * m_scale, m_defaultBackground->m_size.y * m_scale);
 			
 			m_pickAllButton.setScale(m_scale);
 			m_closeButton.setScale(m_scale);
 			
-			m_pickAllButton.update(parent);
-			m_closeButton.update(parent);
+			m_pickAllButton.update(m_rect);
+			m_closeButton.update(m_rect);
 		}
 	}
+}
+
+void SecondaryInventoryHud::updateRect() {
+	
+	m_rect = Rectf(Vec2f(m_fadePosition * m_scale, 0.f), m_size.x * m_scale, m_size.y * m_scale);
 }
 
 void SecondaryInventoryHud::draw() {
@@ -199,8 +204,7 @@ void SecondaryInventoryHud::draw() {
 			ingame_inventory = tc;
 	}
 	
-	Rectf rect = Rectf(Vec2f(m_fadePosition * m_scale, 0.f), m_size.x * m_scale, m_size.y * m_scale);
-	EERIEDrawBitmap(rect, 0.001f, ingame_inventory, Color::white);
+	EERIEDrawBitmap(m_rect, 0.001f, ingame_inventory, Color::white);
 	
 	for(long y = 0; y < inventory->m_size.y; y++) {
 		for(long x = 0; x < inventory->m_size.x; x++) {
@@ -466,7 +470,7 @@ void SecondaryInventoryHud::dropEntity() {
 			
 			// SHOP
 			if(io->ioflags & IO_SHOP) {
-				player.gold += price;
+				ARX_PLAYER_AddGold(price);
 				ARX_SOUND_PlayInterface(SND_GOLD);
 			}
 
@@ -584,12 +588,13 @@ void SecondaryInventoryHud::close() {
 void SecondaryInventoryHud::updateFader() {
 	
 	if(m_fadeDirection != Fade_stable) {
+		float frameDelay = toMs(g_platformTime.lastFrameDuration());
 		if((player.Interface & INTER_COMBATMODE) || player.doingmagic >= 2 || m_fadeDirection == Fade_left) {
 			if(m_fadePosition > -160)
-				m_fadePosition -= (g_framedelay * ( 1.0f / 3 )) * m_scale;
+				m_fadePosition -= (frameDelay * ( 1.0f / 3 )) * m_scale;
 		} else {
 			if(m_fadePosition < 0)
-				m_fadePosition += m_fadeDirection * (g_framedelay * ( 1.0f / 3 )) * m_scale;
+				m_fadePosition += m_fadeDirection * (frameDelay * ( 1.0f / 3 )) * m_scale;
 		}
 		
 		if(m_fadePosition <= -160) {

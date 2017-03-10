@@ -59,6 +59,7 @@ ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 #include "game/effect/ParticleSystems.h"
 
 #include "graphics/Math.h"
+#include "graphics/Raycast.h"
 #include "graphics/data/TextureContainer.h"
 #include "graphics/effects/SpellEffects.h"
 #include "graphics/effects/Fog.h"
@@ -84,7 +85,7 @@ static void LaunchPoisonExplosion(const Vec3f & aePos) {
 	
 	pPS->SetParams(g_particleParameters[ParticleParam_Poison1]);
 	pPS->SetPos(aePos);
-	pPS->Update(0);
+	pPS->Update(ArxDuration_ZERO);
 
 	std::list<Particle *>::iterator i;
 
@@ -126,20 +127,14 @@ void CPoisonProjectile::Create(Vec3f _eSrc, float _fBeta)
 	bOk = false;
 
 	eMove = Vec3f(-fBetaRadSin * 2, 0.f, fBetaRadCos * 2); 
-
-	Vec3f tempHit;
-	Vec3f dest = eSrc;
-
-	int i = 0;
-	while(Visible(eSrc, dest, &tempHit) && i < 20) {
-		dest.x -= fBetaRadSin * 50;
-		dest.z += fBetaRadCos * 50;
-
-		i++;
-	}
-
-	dest.y += 0.f;
-
+	
+	Vec3f rayEnd = eSrc;
+	rayEnd.x -= fBetaRadSin * (50 * 20);
+	rayEnd.z += fBetaRadCos * (50 * 20);
+	
+	RaycastResult ray = RaycastLine(eSrc, rayEnd);
+	Vec3f dest = ray.hit ? ray.pos : rayEnd;
+	
 	pathways[0] = eSrc;
 	pathways[9] = dest;
 	
@@ -152,7 +147,7 @@ void CPoisonProjectile::Create(Vec3f _eSrc, float _fBeta)
 	
 	pPS.SetParams(pp);
 	pPS.SetPos(eSrc);
-	pPS.Update(0);
+	pPS.Update(ArxDuration_ZERO);
 }
 
 void CPoisonProjectile::Update(ArxDuration timeDelta)
@@ -162,7 +157,7 @@ void CPoisonProjectile::Update(ArxDuration timeDelta)
 	}
 
 	// on passe de 5 à 100 partoches en 1.5secs
-	if(m_elapsed < 750) {
+	if(m_elapsed < ArxDurationMs(750)) {
 		pPS.m_parameters.m_nbMax = 2;
 		pPS.Update(timeDelta);
 	} else {
@@ -183,7 +178,7 @@ void CPoisonProjectile::Update(ArxDuration timeDelta)
 		pPS.Update(timeDelta);
 		pPS.SetPos(eCurPos);
 
-		fTrail = ((m_elapsed - 750) * (1.0f / (m_duration - 750.0f))) * 9 * (BEZIERPrecision + 2);
+		fTrail = ((toMs(m_elapsed) - 750) * (1.0f / (toMs(m_duration) - 750.0f))) * 9 * (BEZIERPrecision + 2);
 	}
 
 	if(m_elapsed >= m_duration)

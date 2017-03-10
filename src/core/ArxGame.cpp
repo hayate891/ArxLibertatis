@@ -108,6 +108,7 @@ ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 #include "graphics/particle/Spark.h"
 #include "graphics/texture/TextureStage.h"
 
+#include "gui/Console.h"
 #include "gui/Cursor.h"
 #include "gui/DebugHud.h"
 #include "gui/Hud.h"
@@ -171,7 +172,6 @@ InfoPanels g_debugInfo = InfoPanelNone;
 
 extern bool START_NEW_QUEST;
 SavegameHandle LOADQUEST_SLOT = SavegameHandle(); // OH NO, ANOTHER GLOBAL! - TEMP PATCH TO CLEAN CODE FLOW
-extern long DeadTime;
 
 static const float CURRENT_BASE_FOCAL = 310.f;
 static const float defaultCameraFocal = 350.f;
@@ -745,7 +745,7 @@ static bool HandleGameFlowTransitions() {
 
 
 Vec3f PUSH_PLAYER_FORCE;
-static EERIE_BACKGROUND DefaultBkg;
+static BackgroundData DefaultBkg;
 
 EERIE_CAMERA subj;
 EERIE_CAMERA bookcam;
@@ -854,9 +854,9 @@ bool ArxGame::initGame()
 	
 	LastLoadedScene.clear();
 	
-	DefaultBkg = EERIE_BACKGROUND();
-	ACTIVEBKG=&DefaultBkg;
-	InitBkg(ACTIVEBKG,MAX_BKGX,MAX_BKGZ,BKG_SIZX,BKG_SIZZ);
+	DefaultBkg = BackgroundData();
+	ACTIVEBKG = &DefaultBkg;
+	InitBkg(ACTIVEBKG, MAX_BKGX, MAX_BKGZ, Vec2s(BKG_SIZX, BKG_SIZZ));
 	
 	player.size.y = -player.baseHeight();
 	player.size.x = player.baseRadius();
@@ -1416,8 +1416,8 @@ void ArxGame::speechControlledCinematic() {
 		const CinematicSpeech & acs = aspeech[valid].cine;
 		const Entity * io = aspeech[valid].io;
 		
-		float elapsed = arxtime.now_f() - aspeech[valid].time_creation;
-		float rtime = elapsed / aspeech[valid].duration;
+		float elapsed = arxtime.now_f() - toMs(aspeech[valid].time_creation);
+		float rtime = elapsed / toMs(aspeech[valid].duration);
 
 		rtime = glm::clamp(rtime, 0.f, 1.f);
 
@@ -1549,17 +1549,19 @@ void ArxGame::speechControlledCinematic() {
 	}
 }
 
+extern ArxDuration DeadTime;
+
 void ArxGame::handlePlayerDeath() {
 	if(player.lifePool.current <= 0) {
-		DeadTime += static_cast<long>(g_framedelay);
+		DeadTime += ArxDurationMs(g_framedelay);
 		float mdist = glm::abs(player.physics.cyl.height)-60;
 
 		float startDistance = 40.f;
 
-		float startTime = 2000.f;
-		float endTime = 7000.f;
+		ArxDuration startTime = ArxDurationMs(2000);
+		ArxDuration endTime = ArxDurationMs(7000);
 
-		float DeadCameraDistance = startDistance + (mdist - startDistance) * ((DeadTime - startTime) / (endTime - startTime));
+		float DeadCameraDistance = startDistance + (mdist - startDistance) * (toMs(DeadTime - startTime) / toMs(endTime - startTime));
 
 		Vec3f targetpos = player.pos;
 
@@ -1736,6 +1738,11 @@ void ArxGame::updateInput() {
 				if(GInput->isKeyPressedNowPressed(Keyboard::Key_NumPad0 + i)) {
 					g_debugToggles[i] = !g_debugToggles[i];
 				}
+				if(GInput->isKeyPressed(Keyboard::Key_LeftShift)
+				   && GInput->isKeyPressed(Keyboard::Key_LeftAlt)
+				   && GInput->isKeyPressedNowPressed(Keyboard::Key_0 + i)) {
+					g_debugToggles[i] = !g_debugToggles[i];
+				}
 			}
 		}
 	}
@@ -1747,6 +1754,8 @@ void ArxGame::updateInput() {
 	if(GInput->isKeyPressedNowPressed(Keyboard::Key_ScrollLock)) {
 		drawDebugCycleViews();
 	}
+	
+	g_console.update();
 	
 #ifdef ARX_DEBUG
 	if(GInput->isKeyPressedNowPressed(Keyboard::Key_Pause)) {
@@ -1911,7 +1920,7 @@ void ArxGame::updateLevel() {
 	ARX_SCENE_Update();
 
 	arx_assert(pParticleManager);
-	pParticleManager->Update(static_cast<long>(g_framedelay));
+	pParticleManager->Update(ArxDurationMs(g_framedelay));
 
 	ARX_FOGS_Render();
 
@@ -1943,7 +1952,7 @@ void ArxGame::updateLevel() {
 		SpellBase * spell = spells.getSpellByCaster(EntityHandle_Player, SPELL_MAGIC_SIGHT);
 		if(spell) {
 			ArxDuration duration = arxtime.now() - spell->m_timcreation;
-			magicSightZoom = glm::clamp(float(duration) / 500.f, 0.f, 1.f);
+			magicSightZoom = glm::clamp(toMs(duration) / 500.f, 0.f, 1.f);
 		}
 		
 		float BASE_FOCAL = CURRENT_BASE_FOCAL
@@ -2257,6 +2266,8 @@ void ArxGame::render() {
 		default: break;
 		}
 	}
+	
+	g_console.draw();
 	
 	if(ARXmenu.currentmode == AMCM_OFF) {
 		ARX_SCRIPT_AllowInterScriptExec();

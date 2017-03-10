@@ -39,7 +39,7 @@ private:
 	LightHandle m_light;
 	
 	TextureContainer * tex_p2;
-	unsigned long ulCurrentTime;
+	ArxDuration m_elapsed;
 };
 
 class LevitateSpell : public SpellBase {
@@ -51,7 +51,7 @@ public:
 	void Update();
 	
 private:
-	unsigned long ulCurrentTime;
+	ArxDuration m_elapsed;
 	Vec3f m_pos;
 	float m_baseRadius;
 	RotatingCone cone1;
@@ -73,7 +73,7 @@ private:
 	Vec3f m_pos;
 	LightHandle m_light;
 	ParticleSystem m_particles;
-	unsigned long m_currentTime;
+	ArxDuration m_elapsed;
 };
 
 class RepelUndeadSpell : public SpellBase {

@@ -34,24 +34,24 @@
 FissureFx::FissureFx()
 	: m_elapsed(ArxDuration_ZERO)
 	, m_duration(ArxDuration_ZERO)
-	, ulDurationIntro(1000)
-	, ulDurationRender(1000)
-	, ulDurationOuttro(1000)
+	, m_durationIntro(1000)
+	, m_durationRender(1000)
+	, m_durationOuttro(1000)
 	, m_colorBorder(Color3f::white)
 	, m_colorRays1(Color3f::white)
 	, m_colorRays2(Color3f::black)
 {
-	m_duration = ulDurationIntro + ulDurationRender + ulDurationOuttro;
+	m_duration = m_durationIntro + m_durationRender + m_durationOuttro;
 }
 
 void FissureFx::SetDuration(ArxDuration alDurationIntro, ArxDuration alDurationRender, ArxDuration alDurationOuttro)
 {
-	ulDurationIntro  = arx::clamp(alDurationIntro,  ArxDurationMs(100), ArxDurationMs(100000));
-	ulDurationRender = arx::clamp(alDurationRender, ArxDurationMs(100), ArxDurationMs(100000));
-	ulDurationOuttro = arx::clamp(alDurationOuttro, ArxDurationMs(100), ArxDurationMs(100000));
+	m_durationIntro  = arx::clamp(alDurationIntro,  ArxDurationMs(100), ArxDurationMs(100000));
+	m_durationRender = arx::clamp(alDurationRender, ArxDurationMs(100), ArxDurationMs(100000));
+	m_durationOuttro = arx::clamp(alDurationOuttro, ArxDurationMs(100), ArxDurationMs(100000));
 	
 	m_elapsed = ArxDuration_ZERO;
-	m_duration = ulDurationIntro + ulDurationRender + ulDurationOuttro;
+	m_duration = m_durationIntro + m_durationRender + m_durationOuttro;
 }
 
 void FissureFx::SetColorBorder(Color3f color)
@@ -96,7 +96,7 @@ CRiseDead::CRiseDead()
 
 void CRiseDead::Create(Vec3f aeSrc, float afBeta)
 {
-	SetDuration(ulDurationIntro, ulDurationRender, ulDurationOuttro);
+	SetDuration(m_durationIntro, m_durationRender, m_durationOuttro);
 
 	m_eSrc = aeSrc + Vec3f(0.f, -10.f, 0.f);
 	
@@ -389,7 +389,7 @@ void CRiseDead::RenderFissure() {
 
 void CRiseDead::Update(float timeDelta)
 {
-	m_elapsed += timeDelta;
+	m_elapsed += ArxDurationMs(timeDelta);
 	
 	m_stones.Update(timeDelta, m_eSrc);
 }
@@ -403,29 +403,29 @@ void CRiseDead::Render()
 	
 	//-------------------------------------------------------------------------
 	// render intro (opening + rays)
-	if(m_elapsed < ulDurationIntro) {
-		float fOneOnDurationIntro = 1.f / (float)(ulDurationIntro);
+	if(m_elapsed < m_durationIntro) {
+		float fOneOnDurationIntro = 1.f / toMs(m_durationIntro);
 		
-		if(m_elapsed < ulDurationIntro * 0.666f) {
-			fSizeIntro = (end + 2) * fOneOnDurationIntro * (1.5f) * m_elapsed;
+		if(m_elapsed < ArxDurationMs(toMs(m_durationIntro) * 0.666f)) {
+			fSizeIntro = (end + 2) * fOneOnDurationIntro * (1.5f) * toMs(m_elapsed);
 			sizeF = 1;
 		} else {
 			if(bIntro != false)
 				bIntro = false;
 
-			sizeF = (iSize) * (fOneOnDurationIntro * 3) * (m_elapsed - ulDurationIntro * 0.666f);
+			sizeF = (iSize) * (fOneOnDurationIntro * 3) * (toMs(m_elapsed) - toMs(m_durationIntro) * 0.666f);
 		}
 	}
 	// do nothing just render
-	else if (m_elapsed < (ulDurationIntro + ulDurationRender))
+	else if (m_elapsed < (m_durationIntro + m_durationRender))
 	{
 	}
 	// close it all
 	else if (m_elapsed < m_duration)
 	{
-		float fOneOnDurationOuttro = 1.f / (float)(ulDurationOuttro);
+		float fOneOnDurationOuttro = 1.f / toMs(m_durationOuttro);
 		
-		sizeF = iSize - (iSize) * fOneOnDurationOuttro * (m_elapsed - (ulDurationIntro + ulDurationRender));
+		sizeF = iSize - (iSize) * fOneOnDurationOuttro * toMs(m_elapsed - (m_durationIntro + m_durationRender));
 	}
 	
 	RenderFissure();
@@ -457,7 +457,7 @@ CSummonCreature::CSummonCreature()
 
 void CSummonCreature::Create(Vec3f aeSrc, float afBeta)
 {
-	SetDuration(ulDurationIntro, ulDurationRender, ulDurationOuttro);
+	SetDuration(m_durationIntro, m_durationRender, m_durationOuttro);
 
 	m_eSrc = aeSrc + Vec3f(0.f, -50.f, 0.f);
 	
@@ -704,7 +704,7 @@ void CSummonCreature::RenderFissure() {
 
 void CSummonCreature::Update(float timeDelta)
 {
-	m_elapsed += timeDelta;
+	m_elapsed += ArxDurationMs(timeDelta);
 }
 
 //-----------------------------------------------------------------------------
@@ -716,29 +716,29 @@ void CSummonCreature::Render()
 	
 	//-------------------------------------------------------------------------
 	// render intro (opening + rays)
-	if(m_elapsed < ulDurationIntro) {
-		float fOneOnDurationIntro = 1.f / (float)(ulDurationIntro);
+	if(m_elapsed < m_durationIntro) {
+		float fOneOnDurationIntro = 1.f / toMs(m_durationIntro);
 		
-		if(m_elapsed < ulDurationIntro * 0.666f) {
-			fSizeIntro = (end + 2) * fOneOnDurationIntro * (1.5f) * m_elapsed;
+		if(m_elapsed < ArxDurationMs(toMs(m_durationIntro) * 0.666f)) {
+			fSizeIntro = (end + 2) * fOneOnDurationIntro * (1.5f) * toMs(m_elapsed);
 			sizeF = 1;
 		} else {
 			if(bIntro != false)
 				bIntro = false;
 
-			sizeF = (iSize) * (fOneOnDurationIntro * 3) * (m_elapsed - ulDurationIntro * 0.666f);
+			sizeF = (iSize) * (fOneOnDurationIntro * 3) * (toMs(m_elapsed) - toMs(m_durationIntro) * 0.666f);
 		}
 	}
 	// do nothing just render
-	else if (m_elapsed < (ulDurationIntro + ulDurationRender))
+	else if (m_elapsed < (m_durationIntro + m_durationRender))
 	{
 	}
 	// close it all
 	else if (m_elapsed < m_duration)
 	{
-		float fOneOnDurationOuttro = 1.f / (float)(ulDurationOuttro);
+		float fOneOnDurationOuttro = 1.f / toMs(m_durationOuttro);
 		
-		sizeF = iSize - (iSize) * fOneOnDurationOuttro * (m_elapsed - (ulDurationIntro + ulDurationRender));
+		sizeF = iSize - (iSize) * fOneOnDurationOuttro * toMs(m_elapsed - (m_durationIntro + m_durationRender));
 	}
 	
 	RenderFissure();

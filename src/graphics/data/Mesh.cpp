@@ -97,8 +97,6 @@ ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 
 static void EERIE_PORTAL_Release();
 
-static bool RayIn3DPolyNoCull(const Vec3f & orgn, const Vec3f & dest, const EERIEPOLY & epp);
-
 static bool IntersectLinePlane(const Vec3f & l1, const Vec3f & l2, const EERIEPOLY & ep, Vec3f * intersect) {
 	
 	Vec3f v = l2 - l1;
@@ -114,6 +112,28 @@ static bool IntersectLinePlane(const Vec3f & l1, const Vec3f & l2, const EERIEPO
 		return true;
 	}
 
+	return false;
+}
+
+static bool RayIn3DPolyNoCull(const Vec3f & start, const Vec3f & end, const EERIEPOLY & epp) {
+	
+	Vec3f dir = end - start;
+	
+	Vec3f hit;
+	if(arx::intersectLineTriangle(start, dir, epp.v[0].p, epp.v[1].p, epp.v[2].p, hit)) {
+		if(hit.x >= 0.f && hit.x <= 1.f) {
+			return true;
+		}
+	}
+	
+	if((epp.type & POLY_QUAD)) {
+		if(arx::intersectLineTriangle(start, dir, epp.v[1].p, epp.v[3].p, epp.v[2].p, hit)) {
+			if(hit.x >= 0.f && hit.x <= 1.f) {
+				return true;
+			}
+		}
+	}
+	
 	return false;
 }
 
@@ -183,14 +203,14 @@ long MakeTopObjString(Entity * io, std::string & dest) {
 
 EERIEPOLY * CheckInPoly(const Vec3f & poss, float * needY)
 {
-	long px = poss.x * ACTIVEBKG->Xmul;
-	long pz = poss.z * ACTIVEBKG->Zmul;
+	long px = poss.x * ACTIVEBKG->m_mul.x;
+	long pz = poss.z * ACTIVEBKG->m_mul.y;
 	
-	if(pz <= 0 || pz >= ACTIVEBKG->Zsize - 1 || px <= 0 || px >= ACTIVEBKG->Xsize - 1)
+	if(pz <= 0 || pz >= ACTIVEBKG->m_size.y - 1 || px <= 0 || px >= ACTIVEBKG->m_size.x - 1)
 		return NULL;
 	
-	float rx = poss.x - ((float)px * ACTIVEBKG->Xdiv);
-	float rz = poss.z - ((float)pz * ACTIVEBKG->Zdiv);
+	float rx = poss.x - ((float)px * ACTIVEBKG->m_tileSize.x);
+	float rz = poss.z - ((float)pz * ACTIVEBKG->m_tileSize.y);
 	
 	
 	short minx;
@@ -239,7 +259,7 @@ EERIEPOLY * CheckInPoly(const Vec3f & poss, float * needY)
 	
 	for(short z = minz; z <= maxz; z++)
 	for(short x = minx; x <= maxx; x++) {
-		const EERIE_BKG_INFO & feg = ACTIVEBKG->fastdata[x][z];
+		const BackgroundTileData & feg = ACTIVEBKG->m_tileData[x][z];
 		
 		for(short k = 0; k < feg.nbpolyin; k++) {
 			EERIEPOLY * ep = feg.polyin[k];
@@ -268,20 +288,20 @@ EERIEPOLY * CheckInPoly(const Vec3f & poss, float * needY)
 	return found;
 }
 
-EERIE_BKG_INFO * getFastBackgroundData(float x, float z) {
+BackgroundTileData * getFastBackgroundData(float x, float z) {
 	
-	long px = x * ACTIVEBKG->Xmul;
-	long pz = z * ACTIVEBKG->Zmul;
+	long px = x * ACTIVEBKG->m_mul.x;
+	long pz = z * ACTIVEBKG->m_mul.y;
 
-	if(px < 0 || px >= ACTIVEBKG->Xsize || pz < 0 || pz >= ACTIVEBKG->Zsize)
+	if(px < 0 || px >= ACTIVEBKG->m_size.x || pz < 0 || pz >= ACTIVEBKG->m_size.y)
 		return NULL;
 	
-	return &ACTIVEBKG->fastdata[px][pz];
+	return &ACTIVEBKG->m_tileData[px][pz];
 }
 
 EERIEPOLY * CheckTopPoly(const Vec3f & pos) {
 	
-	EERIE_BKG_INFO * feg = getFastBackgroundData(pos.x, pos.z);
+	BackgroundTileData * feg = getFastBackgroundData(pos.x, pos.z);
 	if(!feg) {
 		return NULL;
 	}
@@ -314,7 +334,7 @@ EERIEPOLY * CheckTopPoly(const Vec3f & pos) {
 
 bool IsAnyPolyThere(float x, float z) {
 	
-	EERIE_BKG_INFO * feg = getFastBackgroundData(x, z);
+	BackgroundTileData * feg = getFastBackgroundData(x, z);
 	if(!feg) {
 		return false;
 	}
@@ -333,7 +353,7 @@ bool IsAnyPolyThere(float x, float z) {
 
 EERIEPOLY * GetMinPoly(const Vec3f & pos) {
 	
-	EERIE_BKG_INFO * feg = getFastBackgroundData(pos.x, pos.z);
+	BackgroundTileData * feg = getFastBackgroundData(pos.x, pos.z);
 	if(!feg) {
 		return NULL;
 	}
@@ -363,7 +383,7 @@ EERIEPOLY * GetMinPoly(const Vec3f & pos) {
 
 EERIEPOLY * GetMaxPoly(const Vec3f & pos) {
 	
-	EERIE_BKG_INFO * feg = getFastBackgroundData(pos.x, pos.z);
+	BackgroundTileData * feg = getFastBackgroundData(pos.x, pos.z);
 	if(!feg) {
 		return NULL;
 	}
@@ -393,7 +413,7 @@ EERIEPOLY * GetMaxPoly(const Vec3f & pos) {
 
 EERIEPOLY * EEIsUnderWater(const Vec3f & pos) {
 	
-	EERIE_BKG_INFO * feg = getFastBackgroundData(pos.x, pos.z);
+	BackgroundTileData * feg = getFastBackgroundData(pos.x, pos.z);
 	if(!feg) {
 		return NULL;
 	}
@@ -429,9 +449,26 @@ bool GetTruePolyY(const EERIEPOLY * ep, const Vec3f & pos, float * ret) {
 	return true;
 }
 
+// TODO copy-paste PortalPoly
+bool GetTruePolyY(const PortalPoly * ep, const Vec3f & pos, float * ret) {
+	
+	Vec3f n = glm::cross(ep->v[1].p - ep->v[0].p, ep->v[2].p - ep->v[0].p);
+	if(n.y == 0.f) {
+		return false;
+	}
+	
+	float y = glm::dot(ep->v[0].p - Vec3f(pos.x, 0.f, pos.z), n) / n.y;
+	
+	// Perhaps we can remove the clamp... (need to test)
+	*ret = glm::clamp(y, ep->min.y, ep->max.y);
+	
+	return true;
+}
+
+
 //*************************************************************************************
 //*************************************************************************************
-EERIE_BACKGROUND * ACTIVEBKG = NULL;
+BackgroundData * ACTIVEBKG = NULL;
 
 Vec3f EE_RT(const Vec3f & in) {
 	return Vec3f(ACTIVECAM->orgTrans.worldToView * Vec4f(in, 1.0f));
@@ -486,288 +523,47 @@ float PtIn2DPolyProj(const std::vector<EERIE_VERTEX> & verts, EERIE_FACE * ef, f
 		return 0.f;
 }
 
-int PointIn2DPolyXZ(const EERIEPOLY * ep, float x, float z) {
+static int PointIn2DPolyXZ(const TexturedVertex (&verts)[4], bool isQuad, float x, float z) {
 	
 	int i, j, c = 0, d = 0;
 
 	for (i = 0, j = 2; i < 3; j = i++)
 	{
-		if ((((ep->v[i].p.z <= z) && (z < ep->v[j].p.z)) ||
-				((ep->v[j].p.z <= z) && (z < ep->v[i].p.z))) &&
-				(x < (ep->v[j].p.x - ep->v[i].p.x) *(z - ep->v[i].p.z) / (ep->v[j].p.z - ep->v[i].p.z) + ep->v[i].p.x))
+		if ((((verts[i].p.z <= z) && (z < verts[j].p.z)) ||
+				((verts[j].p.z <= z) && (z < verts[i].p.z))) &&
+				(x < (verts[j].p.x - verts[i].p.x) *(z - verts[i].p.z) / (verts[j].p.z - verts[i].p.z) + verts[i].p.x))
 			c = !c;
 	}
 
-	if (ep->type & POLY_QUAD)
+	if(isQuad)
 		for (i = 1, j = 3; i < 4; j = i++)
 		{
-			if ((((ep->v[i].p.z <= z) && (z < ep->v[j].p.z)) ||
-					((ep->v[j].p.z <= z) && (z < ep->v[i].p.z))) &&
-					(x < (ep->v[j].p.x - ep->v[i].p.x) *(z - ep->v[i].p.z) / (ep->v[j].p.z - ep->v[i].p.z) + ep->v[i].p.x))
+			if ((((verts[i].p.z <= z) && (z < verts[j].p.z)) ||
+					((verts[j].p.z <= z) && (z < verts[i].p.z))) &&
+					(x < (verts[j].p.x - verts[i].p.x) *(z - verts[i].p.z) / (verts[j].p.z - verts[i].p.z) + verts[i].p.x))
 				d = !d;
 		}
 
 	return c + d;
 }
 
-static bool RayIn3DPolyNoCull(const Vec3f & orgn, const Vec3f & dest, const EERIEPOLY & epp) {
-
-	Vec3f dir = dest - orgn;
-	
-	Vec3f hitPos;
-	bool hit = arx::intersectLineTriangle(orgn, dir, epp.v[0].p, epp.v[1].p, epp.v[2].p, hitPos);
-	
-	if(!hit && (epp.type & POLY_QUAD)) {
-		hit = arx::intersectLineTriangle(orgn, dir, epp.v[1].p, epp.v[3].p, epp.v[2].p, hitPos);
-	}
-	
-	return hit;
+int PointIn2DPolyXZ(const EERIEPOLY * ep, float x, float z) {
+	return PointIn2DPolyXZ(ep->v, (ep->type & POLY_QUAD) != 0, x, z);
 }
 
-int EERIELaunchRay3(const Vec3f & orgn, const Vec3f & dest, Vec3f & hit, long flag) {
-	
-	Vec3f p; //current ray pos
-	Vec3f i;
-	long lpx, lpz;
-	long voidlast;
-	float pas = 1.5f;
-	
-	long iii = 0;
-	float maxstepp = 20000.f / pas;
-	hit = p = orgn;
-	
-	voidlast = 0;
-	lpx = lpz = -1;
-	
-	// ray incs
-	Vec3f d = (dest - orgn);
-	// absolute ray incs
-	Vec3f ad = glm::abs(d);
-	
-	if(ad.x >= ad.y && ad.x >= ad.z) {
-		i.x = (ad.x != d.x) ? (-1.f * pas) : (1.f * pas);
-		i.y = d.y / (ad.x / pas);
-		i.z = d.z / (ad.x / pas);
-	} else if(ad.y >= ad.x && ad.y >= ad.z) {
-		i.x = d.x / (ad.y / pas);
-		i.y = (ad.y != d.y) ? (-1.f * pas) : (1.f * pas);
-		i.z = d.z / (ad.y / pas);
-	} else {
-		i.x = d.x / (ad.z / pas);
-		i.y = d.y / (ad.z / pas);
-		i.z = (ad.z != d.z) ? (-1.f * pas) : (1.f * pas);
-	}
-	
-	for(;;) {
-		
-		p += i;
-		
-		if(i.x == -1.f * pas && p.x <= dest.x) {
-			hit = p;
-			return 0;
-		}
-		
-		if(i.x == 1.f * pas && p.x >= dest.x) {
-			hit = p;
-			return 0;
-		}
-		
-		if(i.y == -1.f * pas && p.y <= dest.y) {
-			hit = p;
-			return 0;
-		}
-		
-		if(i.y == 1.f * pas && p.y >= dest.y) {
-			hit = p;
-			return 0;
-		}
-		
-		if(i.z == -1.f * pas && p.z <= dest.z) {
-			hit = p;
-			return 0;
-		}
-		
-		if(i.z == 1.f * pas && p.z >= dest.z) {
-			hit = p;
-			return 0;
-		}
-		
-		iii++;
-		
-		if(iii > maxstepp) {
-			hit = p;
-			return -1;
-		}
-		
-		long tilex = long(p.x * ACTIVEBKG->Xmul);
-		long tilez = long(p.z * ACTIVEBKG->Zmul);
-		
-		if(tilex < 0 || tilex > ACTIVEBKG->Xsize - 1 || tilez < 0 || tilez > ACTIVEBKG->Zsize - 1) {
-			hit = p;
-			return -1;
-		}
-		
-		if(lpx == tilex && lpz == tilez && voidlast) {
-			continue;
-		}
-		
-		lpx = tilex;
-		lpz = tilez;
-		voidlast = !flag;
-		long minx = glm::clamp(tilex - 1l, 0l, ACTIVEBKG->Xsize - 1l);
-		long maxx = glm::clamp(tilex + 1l, 0l, ACTIVEBKG->Xsize - 1l);
-		long minz = glm::clamp(tilez - 1l, 0l, ACTIVEBKG->Zsize - 1l);
-		long maxz = glm::clamp(tilez + 1l, 0l, ACTIVEBKG->Zsize - 1l);
-		
-		EERIE_BKG_INFO * eg = &ACTIVEBKG->fastdata[tilex][tilez];
-		if(eg->nbpoly == 0) {
-			hit = p;
-			return 1;
-		}
-		
-		for(short z = minz; z < maxz; z++)
-		for(short x = minx; x < maxx; x++) {
-			const EERIE_BKG_INFO & eg = ACTIVEBKG->fastdata[x][z];
-			for(long k = 0; k < eg.nbpoly; k++) {
-				const EERIEPOLY & ep = eg.polydata[k];
-				
-				if(ep.type & POLY_TRANS) {
-					continue;
-				}
-				if(   p.y < ep.min.y - 10.f
-				   || p.y > ep.max.y + 10.f
-				   || p.x < ep.min.x - 10.f
-				   || p.x > ep.max.x + 10.f
-				   || p.z < ep.min.z - 10.f
-				   || p.z > ep.max.z + 10.f
-				) {
-					continue;
-				}
-				voidlast = 0;
-				if(RayIn3DPolyNoCull(orgn, dest, ep)) {
-					hit = p;
-					return 1;
-				}
-			}
-		}
-	}
+int PointIn2DPolyXZ(const PortalPoly * ep, float x, float z) {
+	return PointIn2DPolyXZ(ep->v, true, x, z);
 }
-
-// TODO visible copy-paste
-// Computes the visibility from a point to another... (sort of...)
-bool Visible(const Vec3f & orgn, const Vec3f & dest, Vec3f * hit) {
-	
-	ARX_PROFILE_FUNC();
-	
-	Vec3f i;
-	float pas = 35.f;
-
-	Vec3f found_hit = Vec3f_ZERO;
-	EERIEPOLY *found_ep = NULL;
-	float iter;
-	
-	//current ray pos
-	Vec3f tmpPos = orgn;
-	
-	float distance;
-	float nearest = distance = fdist(orgn, dest);
-
-	if(distance < pas)
-		pas = distance * .5f;
-
-	// ray incs
-	Vec3f d = dest - orgn;
-	
-	// absolute ray incs
-	Vec3f ad = glm::abs(d);
-	
-	if(ad.x >= ad.y && ad.x >= ad.z) {
-		if(ad.x != d.x)
-			i.x = -pas;
-		else
-			i.x = pas;
-
-		iter = ad.x / pas;
-		float t = 1.f / (iter);
-		i.y = d.y * t;
-		i.z = d.z * t;
-	} else if(ad.y >= ad.x && ad.y >= ad.z) {
-		if(ad.y != d.y)
-			i.y = -pas;
-		else
-			i.y = pas;
-
-		iter = ad.y / pas;
-		float t = 1.f / (iter);
-		i.x = d.x * t;
-		i.z = d.z * t;
-	} else {
-		if(ad.z != d.z)
-			i.z = -pas;
-		else
-			i.z = pas;
-
-		iter = ad.z / pas;
-		float t = 1.f / (iter);
-		i.x = d.x * t;
-		i.y = d.y * t;
-	}
-	
-	tmpPos.x -= i.x;
-	tmpPos.y -= i.y;
-	tmpPos.z -= i.z;
-
-	while(iter > 0.f) {
-		iter -= 1.f;
-		tmpPos.x += i.x;
-		tmpPos.y += i.y;
-		tmpPos.z += i.z;
-
-		long px = (long)(tmpPos.x * ACTIVEBKG->Xmul);
-		long pz = (long)(tmpPos.z * ACTIVEBKG->Zmul);
-
-		if(px < 0 || px > ACTIVEBKG->Xsize - 1 || pz < 0 || pz > ACTIVEBKG->Zsize - 1)
-			break;
-
-		EERIE_BKG_INFO * eg = &ACTIVEBKG->fastdata[px][pz];
-
-		for(long k = 0; k < eg->nbpolyin; k++) {
-			EERIEPOLY * ep = eg->polyin[k];
-
-			if(ep)
-			if((ep->min.y - pas < tmpPos.y) && (ep->max.y + pas > tmpPos.y))
-			if((ep->min.x - pas < tmpPos.x) && (ep->max.x + pas > tmpPos.x))
-			if((ep->min.z - pas < tmpPos.z) && (ep->max.z + pas > tmpPos.z))
-			if(RayCollidingPoly(orgn, dest, *ep, hit)) {
-				float dd = fdist(orgn, *hit);
-
-				if(dd < nearest) {
-					nearest = dd;
-					found_ep = ep;
-					found_hit = *hit;
-				}
-			}
-		}
-	}
-
-	if(!found_ep)
-		return true;
-	
-	*hit = found_hit;
-	
-	return false;
-}
-
 
 //*************************************************************************************
 // Counts total number of polys in a background
 //*************************************************************************************
-long BKG_CountPolys(const EERIE_BACKGROUND & eb) {
+long BKG_CountPolys(const BackgroundData & eb) {
 	long count = 0;
 
-	for(long z = 0; z < eb.Zsize; z++)
-	for(long x = 0; x < eb.Xsize; x++) {
-		const EERIE_BKG_INFO & eg = eb.fastdata[x][z];
+	for(long z = 0; z < eb.m_size.y; z++)
+	for(long x = 0; x < eb.m_size.x; x++) {
+		const BackgroundTileData & eg = eb.m_tileData[x][z];
 		count += eg.nbpoly;
 	}
 
@@ -778,12 +574,12 @@ long BKG_CountPolys(const EERIE_BACKGROUND & eb) {
 // Counts number of ignored polys in a background
 //*************************************************************************************
 
-long BKG_CountIgnoredPolys(const EERIE_BACKGROUND & eb) {
+long BKG_CountIgnoredPolys(const BackgroundData & eb) {
 	long count = 0;
 
-	for(long z = 0; z < eb.Zsize; z++)
-	for(long x = 0; x < eb.Xsize; x++) {
-		const EERIE_BKG_INFO & eg = eb.fastdata[x][z];
+	for(long z = 0; z < eb.m_size.y; z++)
+	for(long x = 0; x < eb.m_size.x; x++) {
+		const BackgroundTileData & eg = eb.m_tileData[x][z];
 
 		for(long k = 0; k < eg.nbpoly; k++){
 			const EERIEPOLY & pol = eg.polydata[k];
@@ -797,13 +593,13 @@ long BKG_CountIgnoredPolys(const EERIE_BACKGROUND & eb) {
 }
 
 // Releases BKG_INFO from a tile
-static void ReleaseBKG_INFO(EERIE_BKG_INFO * eg) {
+static void ReleaseBKG_INFO(BackgroundTileData * eg) {
 	free(eg->polydata);
 	eg->polydata = NULL;
 	free(eg->polyin);
 	eg->polyin = NULL;
 	eg->nbpolyin = 0;
-	*eg = EERIE_BKG_INFO();
+	*eg = BackgroundTileData();
 }
 
 //*************************************************************************************
@@ -883,16 +679,16 @@ float SP_GetRoomDist(const Vec3f & pos, const Vec3f & c_pos, long io_room, long 
 }
 
 // Clears a background of its infos
-void ClearBackground(EERIE_BACKGROUND * eb) {
+void ClearBackground(BackgroundData * eb) {
 	
 	if(!eb)
 		return;
 	
 	AnchorData_ClearAll(eb);
 	
-	for(long z = 0; z < eb->Zsize; z++)
-	for(long x = 0; x < eb->Xsize; x++) {
-		ReleaseBKG_INFO(&eb->fastdata[x][z]);
+	for(long z = 0; z < eb->m_size.y; z++)
+	for(long x = 0; x < eb->m_size.x; x++) {
+		ReleaseBKG_INFO(&eb->m_tileData[x][z]);
 	}
 	
 	free(RoomDistance);
@@ -900,11 +696,10 @@ void ClearBackground(EERIE_BACKGROUND * eb) {
 	NbRoomDistance = 0;
 }
 
-int InitBkg(EERIE_BACKGROUND * eb, short sx, short sz, short Xdiv, short Zdiv) {
+void InitBkg(BackgroundData * eb, short sx, short sz, Vec2s tileSize) {
 	
-	if(!eb)
-		return 0;
-
+	arx_assert(eb);
+	
 	if(eb->exist) {
 		EERIE_PORTAL_Release();
 		ClearBackground(eb);
@@ -913,29 +708,26 @@ int InitBkg(EERIE_BACKGROUND * eb, short sx, short sz, short Xdiv, short Zdiv) {
 	eb->exist = 1;
 	eb->anchors = NULL;
 	eb->nbanchors = 0;
-	eb->Xsize = sx;
-	eb->Zsize = sz;
+	eb->m_size.x = sx;
+	eb->m_size.y = sz;
 
-	if (Xdiv < 0) Xdiv = 1;
-	if (Zdiv < 0) Zdiv = 1;
+	if (tileSize.x < 0) tileSize.x = 1;
+	if (tileSize.y < 0) tileSize.y = 1;
 
-	eb->Xdiv = Xdiv;
-	eb->Zdiv = Zdiv;
-	eb->Xmul = 1.f / (float)eb->Xdiv;
-	eb->Zmul = 1.f / (float)eb->Zdiv;
+	eb->m_tileSize = tileSize;
+	eb->m_mul.x = 1.f / (float)eb->m_tileSize.x;
+	eb->m_mul.y = 1.f / (float)eb->m_tileSize.y;
 	
-	for(short z = 0; z < eb->Zsize; z++)
-	for(short x = 0; x < eb->Xsize; x++) {
-		eb->fastdata[x][z] = EERIE_BKG_INFO();
+	for(short z = 0; z < eb->m_size.y; z++)
+	for(short x = 0; x < eb->m_size.x; x++) {
+		eb->m_tileData[x][z] = BackgroundTileData();
 	}
-	
-	return 1;
 }
 
 //*************************************************************************************
 //*************************************************************************************
 
-static void EERIEPOLY_Add_PolyIn(EERIE_BKG_INFO * eg, EERIEPOLY * ep) {
+static void EERIEPOLY_Add_PolyIn(BackgroundTileData * eg, EERIEPOLY * ep) {
 	
 	for(long i = 0; i < eg->nbpolyin; i++)
 		if(eg->polyin[i] == ep)
@@ -961,9 +753,9 @@ static bool PointInBBox(const Vec3f & point, const Rectf & bb) {
 
 void EERIEPOLY_Compute_PolyIn() {
 	
-	for(long z = 0; z < ACTIVEBKG->Zsize; z++)
-	for(long x = 0; x < ACTIVEBKG->Xsize; x++) {
-		EERIE_BKG_INFO *eg = &ACTIVEBKG->fastdata[x][z];
+	for(long z = 0; z < ACTIVEBKG->m_size.y; z++)
+	for(long x = 0; x < ACTIVEBKG->m_size.x; x++) {
+		BackgroundTileData *eg = &ACTIVEBKG->m_tileData[x][z];
 		
 		free(eg->polyin);
 		eg->polyin = NULL;
@@ -971,11 +763,11 @@ void EERIEPOLY_Compute_PolyIn() {
 		
 		long minx = std::max(x - 2, 0L);
 		long minz = std::max(z - 2, 0L);
-		long maxx = std::min(x + 2, ACTIVEBKG->Xsize - 1L);
-		long maxz = std::min(z + 2, ACTIVEBKG->Zsize - 1L);
+		long maxx = std::min(x + 2, ACTIVEBKG->m_size.x - 1L);
+		long maxz = std::min(z + 2, ACTIVEBKG->m_size.y - 1L);
 		
-		Vec2f bbmin = Vec2f(x * ACTIVEBKG->Xdiv - 10, z * ACTIVEBKG->Zdiv - 10);
-		Vec2f bbmax = Vec2f(bbmin.x + ACTIVEBKG->Xdiv + 20, bbmin.y + ACTIVEBKG->Zdiv + 20);
+		Vec2f bbmin = Vec2f(x * ACTIVEBKG->m_tileSize.x - 10, z * ACTIVEBKG->m_tileSize.y - 10);
+		Vec2f bbmax = Vec2f(bbmin.x + ACTIVEBKG->m_tileSize.x + 20, bbmin.y + ACTIVEBKG->m_tileSize.y + 20);
 		
 		Rectf bb = Rectf(bbmin, bbmax);
 		
@@ -983,7 +775,7 @@ void EERIEPOLY_Compute_PolyIn() {
 		
 		for(long z2 = minz; z2 < maxz; z2++)
 		for(long x2 = minx; x2 < maxx; x2++) {
-			EERIE_BKG_INFO *eg2 = &ACTIVEBKG->fastdata[x2][z2];
+			BackgroundTileData *eg2 = &ACTIVEBKG->m_tileData[x2][z2];
 			
 			for(long l = 0; l < eg2->nbpoly; l++) {
 				EERIEPOLY *ep2 = &eg2->polydata[l];
@@ -1059,13 +851,13 @@ static void EERIE_PORTAL_Blend_Portals_And_Rooms() {
 
 	for(size_t num = 0; num < portals->portals.size(); num++) {
 		EERIE_PORTALS & portal = portals->portals[num];
-		EERIEPOLY * ep = &portal.poly;
+		PortalPoly * ep = &portal.poly;
 		
 		portal.poly.norm = CalcFaceNormal(portal.poly.v);
 		
 		ep->center = ep->v[0].p;
 
-		long to = (ep->type & POLY_QUAD) ? 4 : 3;
+		long to = 4;
 
 		float divide = ( 1.0f / to );
 		
@@ -1077,20 +869,15 @@ static void EERIE_PORTAL_Blend_Portals_And_Rooms() {
 		}
 		
 		ep->center *= divide;
-		float d = 0.f;
-
-		for(long ii = 0; ii < to; ii++) {
-			d = std::max(d, glm::distance(ep->center, ep->v[ii].p));
-		}
-
-		ep->norm2.x = d;
-
+		
 		for(size_t nroom = 0; nroom < portals->rooms.size(); nroom++) {
 			if(nroom == portal.room_1 || nroom == portal.room_2)
 			{
-				portals->rooms[nroom].portals = (long *)realloc(portals->rooms[nroom].portals, sizeof(long) * (portals->rooms[nroom].nb_portals + 1));
-				portals->rooms[nroom].portals[portals->rooms[nroom].nb_portals] = num;
-				portals->rooms[nroom].nb_portals++;
+				EERIE_ROOM_DATA & room = portals->rooms[nroom];
+				
+				room.portals = (long *)realloc(room.portals, sizeof(long) * (room.nb_portals + 1));
+				room.portals[room.nb_portals] = num;
+				room.nb_portals++;
 			}
 		}
 	}
@@ -1123,9 +910,9 @@ long CountBkgVertex() {
 
 	long count = 0;
 
-	for(long z = 0; z < ACTIVEBKG->Zsize; z++) {
-		for(long x = 0; x < ACTIVEBKG->Xsize; x++) {
-			const EERIE_BKG_INFO & eg = ACTIVEBKG->fastdata[x][z];
+	for(long z = 0; z < ACTIVEBKG->m_size.y; z++) {
+		for(long x = 0; x < ACTIVEBKG->m_size.x; x++) {
+			const BackgroundTileData & eg = ACTIVEBKG->m_tileData[x][z];
 
 			for(long l = 0; l < eg.nbpoly; l++) {
 				const EERIEPOLY & ep = eg.polydata[l];
@@ -1278,7 +1065,7 @@ bool FastSceneLoad(const res::path & partial_path) {
 		
 		// Skip .scn file list and initialize the scene data
 		(void)fts_read<UNIQUE_HEADER3>(data, end, uh->count);
-		InitBkg(ACTIVEBKG, MAX_BKGX, MAX_BKGZ, BKG_SIZX, BKG_SIZZ);
+		InitBkg(ACTIVEBKG, MAX_BKGX, MAX_BKGZ, Vec2s(BKG_SIZX, BKG_SIZZ));
 		progressBarAdvance();
 		LoadLevelScreen();
 		
@@ -1328,7 +1115,7 @@ static bool loadFastScene(const res::path & file, const char * data, const char 
 		         << FTS_VERSION << " in " << file;
 		return false;
 	}
-	if(fsh->sizex != ACTIVEBKG->Xsize || fsh->sizez != ACTIVEBKG->Zsize) {
+	if(fsh->sizex != ACTIVEBKG->m_size.x || fsh->sizez != ACTIVEBKG->m_size.y) {
 		LogError << "FTS: size mismatch in FAST_SCENE_HEADER";
 		return false;
 	}
@@ -1361,7 +1148,7 @@ static bool loadFastScene(const res::path & file, const char * data, const char 
 			
 			const FAST_SCENE_INFO * fsi = fts_read<FAST_SCENE_INFO>(data, end);
 			
-			EERIE_BKG_INFO & bkg = ACTIVEBKG->fastdata[i][j];
+			BackgroundTileData & bkg = ACTIVEBKG->m_tileData[i][j];
 			
 			bkg.nbianchors = (short)fsi->nbianchors;
 			bkg.nbpoly = (short)fsi->nbpoly;
@@ -1509,22 +1296,21 @@ static bool loadFastScene(const res::path & file, const char * data, const char 
 		portal.room_2 = epo->room_2;
 		portal.useportal = epo->useportal;
 		portal.paddy = epo->paddy;
-		portal.poly.area = epo->poly.area;
-		portal.poly.type = PolyType::load(epo->poly.type);
-		portal.poly.transval = epo->poly.transval;
-		portal.poly.room = epo->poly.room;
-		portal.poly.misc = epo->poly.misc;
 		portal.poly.center = epo->poly.center.toVec3();
 		portal.poly.max = epo->poly.max.toVec3();
 		portal.poly.min = epo->poly.min.toVec3();
 		portal.poly.norm = epo->poly.norm.toVec3();
-		portal.poly.norm2 = epo->poly.norm2.toVec3();
-		
-		for(int i = 0; i < 4; i++)
-			portal.poly.nrml[i] = epo->poly.nrml[i].toVec3();
 		
 		std::copy(epo->poly.v, epo->poly.v + 4, portal.poly.v);
-		std::copy(epo->poly.tv, epo->poly.tv + 4, portal.poly.tv);
+		
+		if(epo->poly.type == 0) {
+			// Make sure all portal polys have 4 vertices
+			// This is required to fix two polys in the original gamedata
+			LogDebug("Adding position for non quad portal poly");
+			portal.poly.v[3].p = glm::mix(portal.poly.v[1].p, portal.poly.v[2].p, 0.5f);
+		} else if(epo->poly.type != 64) {
+			LogWarning << "Invalid poly type found in portal " << epo->poly.type;
+		}
 	}
 	
 	
@@ -1637,7 +1423,7 @@ static Vec3f GetRoomCenter(long room_num) {
 	bbox.max = Vec3f(-99999999.f);
 
 	for(long lll = 0; lll < room.nb_polys; lll++) {
-		const EERIE_BKG_INFO & feg = ACTIVEBKG->fastdata[room.epdata[lll].p.x][room.epdata[lll].p.y];
+		const BackgroundTileData & feg = ACTIVEBKG->m_tileData[room.epdata[lll].tile.x][room.epdata[lll].tile.y];
 		const EERIEPOLY & ep = feg.polydata[room.epdata[lll].idx];
 		bbox.min = glm::min(bbox.min, ep.center);
 		bbox.max = glm::max(bbox.max, ep.center);
@@ -1797,8 +1583,8 @@ static void EERIE_PORTAL_Room_Poly_Add(EERIEPOLY * ep, long nr, long px, long py
 	
 	portals->rooms[nr].epdata = (EP_DATA *)realloc(portals->rooms[nr].epdata, sizeof(EP_DATA) * (portals->rooms[nr].nb_polys + 1));
 	portals->rooms[nr].epdata[portals->rooms[nr].nb_polys].idx = checked_range_cast<short>(idx);
-	portals->rooms[nr].epdata[portals->rooms[nr].nb_polys].p.x = checked_range_cast<short>(px);
-	portals->rooms[nr].epdata[portals->rooms[nr].nb_polys].p.y = checked_range_cast<short>(py);
+	portals->rooms[nr].epdata[portals->rooms[nr].nb_polys].tile.x = checked_range_cast<short>(px);
+	portals->rooms[nr].epdata[portals->rooms[nr].nb_polys].tile.y = checked_range_cast<short>(py);
 	ep->room = checked_range_cast<short>(nr);
 	portals->rooms[nr].nb_polys++;
 }
@@ -1821,8 +1607,16 @@ static void EERIE_PORTAL_Poly_Add(EERIEPOLY * ep, const std::string& name, long 
 
 		portal.room_1 = val1;
 		portal.room_2 = val2;
-		memcpy(&portal.poly, ep, sizeof(EERIEPOLY));
-
+		
+		arx_assert(ep->type == POLY_QUAD);
+		portal.poly.min = ep->min;
+		portal.poly.max = ep->max;
+		portal.poly.norm = ep->norm;
+		
+		std::copy(ep->v, ep->v + 4, portal.poly.v);
+		
+		portal.poly.center = ep->center;
+		
 		float fDistMin = std::numeric_limits<float>::max();
 		float fDistMax = std::numeric_limits<float>::min();
 		int nbvert = (ep->type & POLY_QUAD) ? 4 : 3;
@@ -1860,20 +1654,20 @@ static int BkgAddPoly(EERIEPOLY * ep, EERIE_3DOBJ * eobj) {
 	
 	Vec3f center = (ep->v[0].p + ep->v[1].p + ep->v[2].p) * (1.f/3);
 	
-	long posx = (long)(float)(center.x * ACTIVEBKG->Xmul);
-	long posz = (long)(float)(center.z * ACTIVEBKG->Zmul);
-	long posy = (long)(float)(center.y * ACTIVEBKG->Xmul + ACTIVEBKG->Xsize * .5f);
+	long posx = (long)(float)(center.x * ACTIVEBKG->m_mul.x);
+	long posz = (long)(float)(center.z * ACTIVEBKG->m_mul.y);
+	long posy = (long)(float)(center.y * ACTIVEBKG->m_mul.x + ACTIVEBKG->m_size.x * .5f);
 	
 	if (posy < 0) return 0;
-	else if (posy >= ACTIVEBKG->Xsize) return 0;
+	else if (posy >= ACTIVEBKG->m_size.x) return 0;
 	
 	if (posx < 0) return 0;
-	else if (posx >= ACTIVEBKG->Xsize) return 0;
+	else if (posx >= ACTIVEBKG->m_size.x) return 0;
 	
 	if (posz < 0) return 0;
-	else if (posz >= ACTIVEBKG->Zsize) return 0;
+	else if (posz >= ACTIVEBKG->m_size.y) return 0;
 	
-	EERIE_BKG_INFO *eg = &ACTIVEBKG->fastdata[posx][posz];
+	BackgroundTileData *eg = &ACTIVEBKG->m_tileData[posx][posz];
 	
 	long t = (((eg->nbpoly) >> 1) << 1) + 2; 
 	long tt = (((eg->nbpoly - 1) >> 1) << 1) + 2; 
@@ -2089,10 +1883,10 @@ static bool FastSceneSave(const fs::path & partial_path) {
 		allocsize += ACTIVEBKG->anchors[i].nblinked * sizeof(s32);
 	}
 	
-	for(long j = 0; j < ACTIVEBKG->Zsize; j++) {
-		for(long i = 0; i < ACTIVEBKG->Xsize; i++) {
+	for(long j = 0; j < ACTIVEBKG->m_size.y; j++) {
+		for(long i = 0; i < ACTIVEBKG->m_size.x; i++) {
 			allocsize += sizeof(FAST_SCENE_INFO);
-			allocsize += ACTIVEBKG->fastdata[i][j].nbpoly * (sizeof(EERIEPOLY) + 1);
+			allocsize += ACTIVEBKG->m_tileData[i][j].nbpoly * (sizeof(EERIEPOLY) + 1);
 		}
 	}
 	
@@ -2142,8 +1936,8 @@ static bool FastSceneSave(const fs::path & partial_path) {
 	pos += sizeof(FAST_SCENE_HEADER);
 	
 	fsh->version = FTS_VERSION;
-	fsh->sizex = ACTIVEBKG->Xsize;
-	fsh->sizez = ACTIVEBKG->Zsize;
+	fsh->sizex = ACTIVEBKG->m_size.x;
+	fsh->sizez = ACTIVEBKG->m_size.y;
 	fsh->nb_textures = 0;
 	fsh->playerpos = player.pos;
 	fsh->Mscenepos = Mscenepos;
@@ -2165,9 +1959,9 @@ static bool FastSceneSave(const fs::path & partial_path) {
 	s32 texid = 0;
 	for(long j = 0; j < fsh->sizez; j++) {
 		for(long i = 0; i < fsh->sizex; i++) {
-			for(long k = 0; k < ACTIVEBKG->fastdata[i][j].nbpoly; k++) {
+			for(long k = 0; k < ACTIVEBKG->m_tileData[i][j].nbpoly; k++) {
 				
-				EERIEPOLY * ep = &ACTIVEBKG->fastdata[i][j].polydata[k];
+				EERIEPOLY * ep = &ACTIVEBKG->m_tileData[i][j].polydata[k];
 				
 				if(ep && ep->tex) {
 					
@@ -2201,15 +1995,15 @@ static bool FastSceneSave(const fs::path & partial_path) {
 				return false;
 			}
 			
-			fsi->nbianchors = ACTIVEBKG->fastdata[i][j].nbianchors;
-			fsi->nbpoly = ACTIVEBKG->fastdata[i][j].nbpoly;
+			fsi->nbianchors = ACTIVEBKG->m_tileData[i][j].nbianchors;
+			fsi->nbpoly = ACTIVEBKG->m_tileData[i][j].nbpoly;
 			
 			for(long k = 0; k < fsi->nbpoly; k++) {
 				fsh->nb_polys++;
 				
 				FAST_EERIEPOLY * ep = reinterpret_cast<FAST_EERIEPOLY *>(dat + pos);
 				pos += sizeof(FAST_EERIEPOLY);
-				EERIEPOLY * ep2 = &ACTIVEBKG->fastdata[i][j].polydata[k];
+				EERIEPOLY * ep2 = &ACTIVEBKG->m_tileData[i][j].polydata[k];
 				
 				if(pos >= allocsize - 100000) {
 					delete[] dat;
@@ -2242,7 +2036,7 @@ static bool FastSceneSave(const fs::path & partial_path) {
 					delete[] dat;
 					return false;
 				}
-				*ianch = ACTIVEBKG->fastdata[i][j].ianchors[k];
+				*ianch = ACTIVEBKG->m_tileData[i][j].ianchors[k];
 			}
 		}
 	}
@@ -2288,20 +2082,22 @@ static bool FastSceneSave(const fs::path & partial_path) {
 			epo->room_2 = portal.room_2;
 			epo->useportal = portal.useportal;
 			epo->paddy = portal.paddy;
-			epo->poly.area = portal.poly.area;
-			epo->poly.type = portal.poly.type;
-			epo->poly.transval = portal.poly.transval;
-			epo->poly.room = portal.poly.room;
-			epo->poly.misc = portal.poly.misc;
+			epo->poly.area = 0.f;
+			epo->poly.type = 64; // Marks the poly as a quad
+			epo->poly.transval = 0.f;
+			epo->poly.room = 0;
+			epo->poly.misc = 0;
 			epo->poly.center = portal.poly.center;
 			epo->poly.max = portal.poly.max;
 			epo->poly.min = portal.poly.min;
 			epo->poly.norm = portal.poly.norm;
-			epo->poly.norm2 = portal.poly.norm2;
+			epo->poly.norm2 = Vec3f_ZERO;
 			
-			std::copy(portal.poly.nrml, portal.poly.nrml + 4, epo->poly.nrml);
+			std::fill(epo->poly.nrml, epo->poly.nrml + 4, Vec3f_ZERO);
+			
 			std::copy(portal.poly.v, portal.poly.v + 4, epo->poly.v);
-			std::copy(portal.poly.tv, portal.poly.tv + 4, epo->poly.tv);
+			
+			std::fill(epo->poly.tv, epo->poly.tv + 4, TexturedVertex());
 		}
 		
 		for(size_t i = 0; i < portals->rooms.size(); i++) {
@@ -2485,9 +2281,9 @@ void ComputePortalVertexBuffer() {
 		// Count vertices / indices for each texture and blend types
 		int vertexCount = 0, indexCount = 0, ignored = 0, hidden = 0, notex = 0;
 		for(int j = 0; j < room->nb_polys; j++) {
-			int x = room->epdata[j].p.x;
-			int y = room->epdata[j].p.y;
-			EERIE_BKG_INFO & cell = ACTIVEBKG->fastdata[x][y];
+			int x = room->epdata[j].tile.x;
+			int y = room->epdata[j].tile.y;
+			BackgroundTileData & cell = ACTIVEBKG->m_tileData[x][y];
 			EERIEPOLY & poly = cell.polydata[room->epdata[j].idx];
 			
 			if(poly.type & POLY_IGNORE) {
@@ -2589,10 +2385,9 @@ void ComputePortalVertexBuffer() {
 			
 			// Upload all vertices for this texture and remember the indices
 			for(int j = 0; j < room->nb_polys; j++) {
-				int x = room->epdata[j].p.x;
-				int y = room->epdata[j].p.y;
-				EERIE_BKG_INFO & cell = ACTIVEBKG->fastdata[x][y];
-				EERIEPOLY & poly = cell.polydata[room->epdata[j].idx];
+				Vec2s tilePos = room->epdata[j].tile;
+				BackgroundTileData & tile = ACTIVEBKG->m_tileData[tilePos.x][tilePos.y];
+				EERIEPOLY & poly = tile.polydata[room->epdata[j].idx];
 				
 				if((poly.type & POLY_IGNORE) || (poly.type & POLY_HIDE) || !poly.tex) {
 					continue;

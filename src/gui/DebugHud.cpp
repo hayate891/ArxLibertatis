@@ -163,7 +163,7 @@ void ShowInfoText() {
 	frameInfo.add("Particles", getParticleCount());
 	frameInfo.add("Sparks", ParticleSparkCount());
 	frameInfo.add("Polybooms", long(PolyBoomCount()));
-	frameInfo.add("TIME", static_cast<long>(arxtime.now() / 1000));
+	frameInfo.add("TIME", static_cast<long>(toMs(arxtime.now()) / 1000));
 	frameInfo.print();
 	
 	DebugBox camBox = DebugBox(Vec2i(10, frameInfo.size().y + 5), "Camera");
@@ -257,9 +257,7 @@ void ShowInfoText() {
 	scriptBox.print();
 	}
 	
-	if(ValidIONum(LastSelectedIONum)) {
-		Entity * io = entities[LastSelectedIONum];
-
+		Entity * io = entities.get(LastSelectedIONum);
 		if(io) {
 			DebugBox entityBox = DebugBox(Vec2i(500, 10), "Entity " + io->idString());
 			entityBox.add("Pos", io->pos);
@@ -328,7 +326,6 @@ void ShowInfoText() {
 				column2y = animLayerBox.size().y + 5;
 			}
 		}
-	}
 	
 	ARX_SCRIPT_Init_Event_Stats();
 }
@@ -438,8 +435,8 @@ void ShowFpsGraph() {
 		oss << std::fixed << std::setprecision(2) << values[i] << " FPS";
 		texts[i] = oss.str();
 		// Calculate widths (could be done more efficiently for monospace fonts...)
-		labelWidth = std::max(labelWidth, float(font->getTextSize(labels[i]).x));
-		widths[i] = font->getTextSize(texts[i]).x;
+		labelWidth = std::max(labelWidth, float(font->getTextSize(labels[i]).width()));
+		widths[i] = font->getTextSize(texts[i]).width();
 		valueWidth = std::max(valueWidth, widths[i]);
 	}
 

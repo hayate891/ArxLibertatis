@@ -27,8 +27,6 @@
 #include "gui/hud/HudCommon.h"
 #include "math/Types.h"
 
-extern bool bIsAiming;
-
 /*!
  * \brief the hit strength diamond shown at the bottom of the UI.
  */
@@ -134,7 +132,6 @@ public:
 class CurrentTorchIconGui : public HudItem {
 private:
 	bool m_isActive;
-	Rectf m_rect;
 	TextureContainer * m_tex;
 	Vec2f m_size;
 	
@@ -170,9 +167,9 @@ public:
 class QuickSaveIconGui {
 private:
 	//! Time in ms to show the icon
-	u32 m_duration;
-	//! Remaining time for the quick sive icon
-	unsigned m_remainingTime;
+	ArxDuration m_duration;
+	//! Remaining time for the quick save icon
+	ArxDuration m_remainingTime;
 	
 public:
 	QuickSaveIconGui();
@@ -238,7 +235,7 @@ private:
 	Vec2f m_iconSize;
 	TextureContainer * m_tex;
 	Color m_color;
-	long m_timeToDraw;
+	ArxDuration m_timeToDraw;
 	long m_nbToDraw;
 	
 public:
@@ -366,7 +363,8 @@ public:
 	StealthGauge();
 	
 	void init();
-	void update(const Rectf & parent);
+	void updateRect(const Rectf & parent);
+	void update();
 	void draw();
 };
 

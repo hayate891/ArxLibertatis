@@ -86,6 +86,7 @@ ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 #include "io/resource/ResourcePath.h"
 
 #include "math/Random.h"
+#include "math/RandomVector.h"
 
 #include "physics/Collisions.h"
 #include "platform/profiler/Profiler.h"
@@ -634,17 +635,17 @@ static void ARX_DAMAGES_PushIO(Entity * io_target, EntityHandle source, float po
 	}
 }
 
-void ARX_DAMAGES_DealDamages(EntityHandle target, float dmg, EntityHandle source, DamageType flags, Vec3f * pos)
-{
-	if(!ValidIONum(target) || !ValidIONum(source))
+void ARX_DAMAGES_DealDamages(EntityHandle target, float dmg, EntityHandle source, DamageType flags, Vec3f * pos) {
+	if(!ValidIONum(target) || !ValidIONum(source)) {
 		return;
+	}
 
 	Entity * io_target = entities[target];
 	Entity * io_source = entities[source];
 	float damagesdone;
 
 	if(flags & DAMAGE_TYPE_PER_SECOND) {
-		dmg = dmg * g_framedelay * ( 1.0f / 1000 );
+		dmg = dmg * g_framedelay * (1.0f / 1000);
 	}
 
 	if(target == EntityHandle_Player) {
@@ -666,16 +667,6 @@ void ARX_DAMAGES_DealDamages(EntityHandle target, float dmg, EntityHandle source
 
 		if(flags & DAMAGE_TYPE_FIRE)
 			ARX_DAMAGES_IgnitIO(io_target, damagesdone);
-
-		if(flags & DAMAGE_TYPE_DRAIN_LIFE)
-			ARX_DAMAGES_HealInter(io_source, damagesdone);
-
-		if(flags & DAMAGE_TYPE_DRAIN_MANA)
-			ARX_DAMAGES_HealManaInter(io_source, damagesdone);
-
-		if(flags & DAMAGE_TYPE_PUSH)
-			ARX_DAMAGES_PushIO(io_target, source, damagesdone * ( 1.0f / 2 ));
-		
 	} else {
 		if(io_target->ioflags & IO_NPC) {
 			if(flags & DAMAGE_TYPE_POISON) {
@@ -687,8 +678,9 @@ void ARX_DAMAGES_DealDamages(EntityHandle target, float dmg, EntityHandle source
 				}
 			} else {
 				if(flags & DAMAGE_TYPE_FIRE) {
-					if(Random::getf(0.f, 100.f) <= io_target->_npcdata->resist_fire)
+					if(Random::getf(0.f, 100.f) <= io_target->_npcdata->resist_fire) {
 						dmg = 0;
+					}
 
 					ARX_DAMAGES_IgnitIO(io_target, dmg);
 				}
@@ -699,17 +691,21 @@ void ARX_DAMAGES_DealDamages(EntityHandle target, float dmg, EntityHandle source
 					damagesdone = ARX_DAMAGES_DamageNPC(io_target, dmg, source, true, pos);
 				}
 			}
-
-			if(flags & DAMAGE_TYPE_DRAIN_LIFE)
-				ARX_DAMAGES_HealInter(io_source, damagesdone);
-
-			if(flags & DAMAGE_TYPE_DRAIN_MANA)
-				ARX_DAMAGES_HealManaInter(io_source, damagesdone);
-
-			if(flags & DAMAGE_TYPE_PUSH)
-				ARX_DAMAGES_PushIO(io_target, source, damagesdone * ( 1.0f / 2 ));
-			
+		} else {
+			return;
 		}
+	}
+
+	if(flags & DAMAGE_TYPE_DRAIN_LIFE) {
+		ARX_DAMAGES_HealInter(io_source, damagesdone);
+	}
+
+	if(flags & DAMAGE_TYPE_DRAIN_MANA) {
+		ARX_DAMAGES_HealManaInter(io_source, damagesdone);
+	}
+
+	if(flags & DAMAGE_TYPE_PUSH) {
+		ARX_DAMAGES_PushIO(io_target, source, damagesdone * (1.0f / 2));
 	}
 }
 
@@ -896,7 +892,7 @@ static void ARX_DAMAGES_AddVisual(DAMAGE_INFO & di, const Vec3f & pos, float dmg
 	}
 	
 	ArxInstant now = arxtime.now();
-	if(di.lastupd + 200 < now) {
+	if(di.lastupd + ArxDurationMs(200) < now) {
 		di.lastupd = now;
 		if(di.params.type & DAMAGE_TYPE_MAGICAL) {
 			ARX_SOUND_PlaySFX(SND_SPELL_MAGICAL_HIT, &pos, Random::getf(0.8f, 1.2f));
@@ -916,12 +912,12 @@ static void ARX_DAMAGES_AddVisual(DAMAGE_INFO & di, const Vec3f & pos, float dmg
 			break;
 		}
 		
-		pd->ov = vertPos + randomVec(-5.f, 5.f);
+		pd->ov = vertPos + arx::randomVec(-5.f, 5.f);
 		pd->siz = glm::clamp(dmg, 5.f, 15.f);
 		pd->scale = Vec3f(-10.f);
 		pd->m_flags = ROTATING | FIRE_TO_SMOKE;
 		pd->tolive = Random::getu(500, 900);
-		pd->move = Vec3f(1.f, 2.f, 1.f) - randomVec3f() * Vec3f(2.f, 16.f, 2.f);
+		pd->move = Vec3f(1.f, 2.f, 1.f) - arx::randomVec3f() * Vec3f(2.f, 16.f, 2.f);
 		if(di.params.type & DAMAGE_TYPE_MAGICAL) {
 			pd->rgb = Color3f(0.3f, 0.3f, 0.8f);
 		} else {
@@ -959,13 +955,13 @@ static void ARX_DAMAGES_UpdateDamage(DamageHandle j, ArxInstant now) {
 	} else if(damage.params.duration == ArxDuration(-1)) {
 		dmg = damage.params.damages;
 	} else {
-		float FD = g_framedelay;
+		ArxDuration FD = ArxDurationMs(g_framedelay);
 		
 		if(now > damage.start_time + damage.params.duration) {
 			FD -= damage.start_time + damage.params.duration - now;
 		}
 		
-		dmg = damage.params.damages * FD * ( 1.0f / 1000 );
+		dmg = damage.params.damages * toMs(FD) * ( 1.0f / 1000 );
 	}
 	
 	bool validsource = ValidIONum(damage.params.source);
@@ -1485,8 +1481,8 @@ void ARX_DAMAGES_DamagePlayerEquipment(float damages)
 		ratio = 1.f;
 	
 	for(size_t i = 0; i < MAX_EQUIPED; i++) {
-		if(ValidIONum(player.equiped[i])) {
-			Entity * todamage = entities[player.equiped[i]];
+		Entity * todamage = entities.get(player.equiped[i]);
+		if(todamage) {
 			ARX_DAMAGES_DurabilityCheck(todamage, ratio);
 		}
 	}

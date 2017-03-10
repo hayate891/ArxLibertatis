@@ -37,6 +37,7 @@
 #include "graphics/Draw.h"
 #include "graphics/Renderer.h"
 #include "graphics/data/TextureContainer.h"
+#include "math/RandomVector.h"
 
 struct MagicFlare {
 	unsigned char exist;
@@ -45,7 +46,7 @@ struct MagicFlare {
 	TexturedVertex v;
 	TexturedVertex tv;
 	Vec2f pos;
-	float tolive;
+	PlatformDuration tolive;
 	Color3f rgb;
 	float size;
 	LightHandle dynlight;
@@ -126,7 +127,7 @@ static void removeFlare(MagicFlare & flare) {
 
 	lightHandleDestroy(flare.dynlight);
 	
-	flare.tolive = 0;
+	flare.tolive = PlatformDuration_ZERO;
 	flare.exist = 0;
 	g_magicFlaresCount--;
 	
@@ -249,20 +250,20 @@ void AddFlare(const Vec2f & pos, float sm, short typ, Entity * io, bool bookDraw
 		if(zz < 0.2f) {
 			flare.type = 2;
 			flare.size = Random::getf(42.f, 84.f);
-			flare.tolive = Random::getf(800.f, 1600.f) * FLARE_MUL;
+			flare.tolive = PlatformDurationMs(Random::getf(800.f, 1600.f) * FLARE_MUL);
 		} else if(zz < 0.5f) {
 			flare.type = 3;
 			flare.size = Random::getf(16.f, 68.f);
-			flare.tolive = Random::getf(800.f, 1600.f) * FLARE_MUL;
+			flare.tolive = PlatformDurationMs(Random::getf(800.f, 1600.f) * FLARE_MUL);
 		} else {
 			flare.type = 1;
 			flare.size = Random::getf(32.f, 56.f) * sm;
-			flare.tolive = Random::getf(1700.f, 2200.f) * FLARE_MUL;
+			flare.tolive = PlatformDurationMs(Random::getf(1700.f, 2200.f) * FLARE_MUL);
 		}
 	} else {
 		flare.type = (Random::getf() > 0.8f) ? 1 : 4;
 		flare.size = Random::getf(64.f, 102.f) * sm;
-		flare.tolive = Random::getf(1700.f, 2200.f) * FLARE_MUL;
+		flare.tolive = PlatformDurationMs(Random::getf(1700.f, 2200.f) * FLARE_MUL);
 	}
 
 	flare.dynlight = LightHandle();
@@ -287,7 +288,7 @@ void AddFlare(const Vec2f & pos, float sm, short typ, Entity * io, bool bookDraw
 			pd->m_flags = FADE_IN_AND_OUT;
 		}
 
-		pd->ov = flare.v.p + randomVec(-5.f, 5.f);
+		pd->ov = flare.v.p + arx::randomVec(-5.f, 5.f);
 		pd->move = Vec3f(0.f, 5.f, 0.f);
 		pd->scale = Vec3f(-2.f);
 		pd->tolive = 1300 + kk * 100 + Random::getu(0, 800);
@@ -373,7 +374,7 @@ void ARX_MAGICAL_FLARES_Update() {
 		shinum = 1;
 	}
 	
-	float diff = toMs(g_platformTime.lastFrameDuration());
+	PlatformDuration diff = g_platformTime.lastFrameDuration();
 	
 	bool key = !GInput->actionPressed(CONTROLS_CUST_MAGICMODE);
 
@@ -402,14 +403,14 @@ void ARX_MAGICAL_FLARES_Update() {
 				continue;
 			}
 
-			flare.tolive -= diff * 2.f;
+			flare.tolive -= diff * 2;
 			if(flare.flags & 1) {
-				flare.tolive -= diff * 4.f;
+				flare.tolive -= diff * 4;
 			} else if (key) {
-				flare.tolive -= diff * 6.f;
+				flare.tolive -= diff * 6;
 			}
 
-			float z = (flare.tolive * 0.00025f);
+			float z = toMs(flare.tolive) * 0.00025f;
 			float size;
 			if(flare.type == 1) {
 				size = flare.size * 2 * z;
@@ -419,7 +420,7 @@ void ARX_MAGICAL_FLARES_Update() {
 				size = flare.size;
 			}
 
-			if(flare.tolive <= 0.f || flare.pos.y < -64.f || size < 3.f) {
+			if(flare.tolive <= PlatformDuration_ZERO || flare.pos.y < -64.f || size < 3.f) {
 				removeFlare(flare);
 				continue;
 			}

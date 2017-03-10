@@ -69,6 +69,8 @@ public:
 		: MenuPage(pos, size, NEW_QUEST)
 	{}
 	
+	~NewQuestMenuPage() { }
+	
 	void init() {
 		
 		{
@@ -110,6 +112,8 @@ public:
 	ChooseLoadOrSaveMenuPage(const Vec2f & pos, const Vec2f & size)
 		: MenuPage(pos, size, EDIT_QUEST)
 	{}
+	
+	~ChooseLoadOrSaveMenuPage() { }
 	
 	void init() {
 		
@@ -173,6 +177,8 @@ public:
 		: MenuPage(pos, size, EDIT_QUEST_LOAD)
 	{}
 	
+	~LoadMenuPage() { }
+	
 	void init() {
 		
 		{
@@ -234,7 +240,7 @@ public:
 			szMenuText += "   ";
 			TextWidget * txt = new TextWidget(BUTTON_MENUEDITQUEST_DELETE_CONFIRM, hFontMenu, szMenuText, Vec2f_ZERO);
 			txt->m_targetMenu = EDIT_QUEST_LOAD;
-			txt->SetPos(Vec2f(RATIO_X(m_size.x-10)-txt->m_rect.width(), RATIO_Y(42)));
+			txt->SetPos(Vec2f(RATIO_X(m_size.x-10)-txt->m_rect.width(), RATIO_Y(54)));
 			txt->SetCheckOff();
 			txt->lOldColor = txt->lColor;
 			txt->lColor = Color::grayb(127);
@@ -285,6 +291,8 @@ public:
 	SaveMenuPage(const Vec2f & pos, const Vec2f & size)
 		: MenuPage(pos, size, EDIT_QUEST_SAVE)
 	{}
+	
+	~SaveMenuPage() { }
 	
 	void init() {
 		
@@ -369,6 +377,8 @@ public:
 		: MenuPage(pos, size, EDIT_QUEST_SAVE_CONFIRM)
 	{}
 	
+	~SaveConfirmMenuPage() { }
+	
 	void init() {
 		
 		{
@@ -428,6 +438,8 @@ public:
 	OptionsMenuPage(const Vec2f & pos, const Vec2f & size)
 		: MenuPage(pos, size, OPTIONS)
 	{}
+	
+	~OptionsMenuPage() { }
 	
 	void init() {
 		
@@ -493,6 +505,8 @@ public:
 		fullscreenCheckbox = NULL;
 		pMenuSliderResol = NULL;
 	}
+	
+	~VideoOptionsMenuPage() { }
 	
 	CheckboxWidget * fullscreenCheckbox;
 	CycleTextWidget * pMenuSliderResol;
@@ -892,6 +906,8 @@ public:
 		: MenuPage(pos, size, OPTIONS_INTERFACE)
 	{ }
 	
+	~InterfaceOptionsMenuPage() { }
+	
 	void init() {
 		
 		{
@@ -1040,6 +1056,8 @@ public:
 	AudioOptionsMenuPage(const Vec2f & pos, const Vec2f & size)
 		: MenuPage(pos, size, OPTIONS_AUDIO)
 	{}
+	
+	~AudioOptionsMenuPage() { }
 	
 	void init() {
 		
@@ -1208,6 +1226,8 @@ public:
 		: MenuPage(pos, size, OPTIONS_INPUT)
 	{}
 	
+	~InputOptionsMenuPage() { }
+	
 	void init() {
 		
 		{
@@ -1312,6 +1332,15 @@ public:
 		}
 		
 		{
+			std::string szMenuText = getLocalised("system_menus_alt_rune_recognition", "Alternate rune recognition");
+			TextWidget * txt = new TextWidget(BUTTON_INVALID, hFontMenu, szMenuText, Vec2f(20, 0));
+			CheckboxWidget * cb = new CheckboxWidget(txt);
+			cb->stateChanged = boost::bind(&InputOptionsMenuPage::onChangedAltRuneRecognition, this, _1);
+			cb->iState = config.input.useAltRuneRecognition ? 1 : 0;
+			addCenter(cb);
+		}
+		
+		{
 			ButtonWidget * cb = new ButtonWidget(Vec2f(20, 380), Vec2f(16, 16), "graph/interface/menus/back");
 			cb->m_targetMenu = OPTIONS;
 			cb->SetShortCut(Keyboard::Key_Escape);
@@ -1356,6 +1385,10 @@ private:
 	
 	void onChangedBorderTurning(int value) {
 		config.input.borderTurning = (value) ? true : false;
+	}
+	
+	void onChangedAltRuneRecognition(int value) {
+		config.input.useAltRuneRecognition = (value) ? true : false;
 	}
 	
 };
@@ -1423,6 +1456,8 @@ public:
 	ControlOptionsMenuPage1(const Vec2f & pos, const Vec2f & size)
 		: ControlOptionsPage(pos, size, OPTIONS_INPUT_CUSTOMIZE_KEYS_1)
 	{}
+	
+	~ControlOptionsMenuPage1() { }
 	
 	void init() {
 		
@@ -1494,6 +1529,8 @@ public:
 		: ControlOptionsPage(pos, size, OPTIONS_INPUT_CUSTOMIZE_KEYS_2)
 	{}
 	
+	~ControlOptionsMenuPage2() { }
+	
 	void init() {
 		
 		long y = static_cast<long>(RATIO_Y(8.f));
@@ -1525,6 +1562,10 @@ public:
 		
 		addControlRow(y, CONTROLS_CUST_TOGGLE_FULLSCREEN, "system_menus_options_input_customize_controls_toggle_fullscreen", "Toggle fullscreen");
 		
+		if(config.input.allowConsole) {
+			addControlRow(y, CONTROLS_CUST_CONSOLE, "system_menus_options_input_customize_controls_console", "Script console");
+		}
+		
 		{
 			ButtonWidget * cb = new ButtonWidget(Vec2f(20, 380), Vec2f(16, 16), "graph/interface/menus/back");
 			cb->m_targetMenu = OPTIONS_INPUT_CUSTOMIZE_KEYS_1;
@@ -1551,6 +1592,8 @@ public:
 	QuitConfirmMenuPage(const Vec2f & pos, const Vec2f & size)
 		: MenuPage(pos, size, QUIT)
 	{}
+	
+	~QuitConfirmMenuPage() { }
 	
 	void init() {
 		
@@ -1768,7 +1811,7 @@ void MainMenu::init()
 		version += "\"";
 	}
 
-	float verPosX = 620 - (hFontControls->getTextSize(version).x / g_sizeRatio.y);
+	float verPosX = 620 - (hFontControls->getTextSize(version).width() / g_sizeRatio.y);
 	TextWidget * txt = new TextWidget(BUTTON_INVALID, hFontControls, version, Vec2f(verPosX, 80));
 	
 	txt->SetCheckOff();

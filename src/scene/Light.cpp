@@ -294,7 +294,7 @@ void TreatBackgroundDynlights() {
 	for(size_t i = 0; i < g_dynamicLightsMax; i++) {
 		EERIE_LIGHT * el = &g_dynamicLights[i];
 
-		if(el->exist && el->duration) {
+		if(el->exist && el->duration != ArxDuration_ZERO) {
 			const ArxDuration elapsed = arxtime.now() - el->creationTime;
 			const ArxDuration duration = el->duration;
 
@@ -329,10 +329,10 @@ void PrecalcDynamicLighting(long x0, long z0, long x1, long z1, const Vec3f & ca
 	
 	g_culledDynamicLightsCount = 0;
 	
-	float fx0 = ACTIVEBKG->Xdiv * x0;
-	float fz0 = ACTIVEBKG->Zdiv * z0;
-	float fx1 = ACTIVEBKG->Xdiv * x1;
-	float fz1 = ACTIVEBKG->Zdiv * z1;
+	float fx0 = ACTIVEBKG->m_tileSize.x * x0;
+	float fz0 = ACTIVEBKG->m_tileSize.y * z0;
+	float fx1 = ACTIVEBKG->m_tileSize.x * x1;
+	float fz1 = ACTIVEBKG->m_tileSize.y * z1;
 	
 	for(size_t i = 0; i < g_dynamicLightsMax; i++) {
 		EERIE_LIGHT * el = &g_dynamicLights[i];
@@ -535,6 +535,8 @@ void setMaxLLights(int count) {
 
 void UpdateLlights(ShaderLight lights[], int & lightsCount, const Vec3f pos, bool forPlayerColor) {
 	
+	ARX_PROFILE_FUNC();
+	
 	boost::array<EERIE_LIGHT *, llightsSize> llights;
 	llights.fill(NULL);
 	boost::array<float, llightsSize> values;
@@ -588,8 +590,8 @@ void ResetTileLights() {
 	
 	ARX_PROFILE_FUNC();
 	
-	for(long z = 0; z < ACTIVEBKG->Zsize; z++)
-	for(long x = 0; x < ACTIVEBKG->Xsize; x++) {
+	for(long z = 0; z < ACTIVEBKG->m_size.y; z++)
+	for(long x = 0; x < ACTIVEBKG->m_size.x; x++) {
 		tilelights[x][z].el.clear();
 	}
 }
@@ -597,13 +599,13 @@ void ResetTileLights() {
 void ComputeTileLights(short x,short z)
 {
 	tilelights[x][z].el.clear();
-	float xx = (x + 0.5f) * ACTIVEBKG->Xdiv;
-	float zz = (z + 0.5f) * ACTIVEBKG->Zdiv;
-
+	
+	Vec2f tileCenter = (Vec2f(x, z) + 0.5f) * Vec2f(ACTIVEBKG->m_tileSize);
+	
 	for(size_t i = 0; i < g_culledDynamicLightsCount; i++) {
 		EERIE_LIGHT * light = g_culledDynamicLights[i];
 		
-		if(closerThan(Vec2f(xx, zz), Vec2f(light->pos.x, light->pos.z), light->fallend + 60.f)) {
+		if(closerThan(tileCenter, Vec2f(light->pos.x, light->pos.z), light->fallend + 60.f)) {
 
 			tilelights[x][z].el.push_back(light);
 		}
@@ -664,7 +666,7 @@ float GetColorz(const Vec3f &pos) {
 		float div = (1.0f / to);
 
 		EP_DATA & epdata = portals->rooms[ep->room].epdata[0];
-		ApplyTileLights(ep, epdata.p);
+		ApplyTileLights(ep, epdata.tile);
 
 		for(long i = 0; i < to; i++) {
 			Color col = Color::fromRGBA(ep->tv[i].color);
@@ -816,9 +818,9 @@ void EERIERemovePrecalcLights() {
 	}
 	
 	// TODO copy-paste poly iteration
-	for(short z = 0; z < ACTIVEBKG->Zsize; z++)
-	for(short x = 0; x < ACTIVEBKG->Xsize; x++) {
-		EERIE_BKG_INFO & eg = ACTIVEBKG->fastdata[x][z];
+	for(short z = 0; z < ACTIVEBKG->m_size.y; z++)
+	for(short x = 0; x < ACTIVEBKG->m_size.x; x++) {
+		BackgroundTileData & eg = ACTIVEBKG->m_tileData[x][z];
 		for(short l = 0; l < eg.nbpoly; l++) {
 			EERIEPOLY & ep = eg.polydata[l];
 			

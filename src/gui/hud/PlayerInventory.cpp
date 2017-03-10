@@ -64,6 +64,18 @@ Vec2f PlayerInventoryHud::anchorPosition() {
 	g_size.height() - (101 * m_scale) + (InventoryY * m_scale));
 }
 
+void PlayerInventoryHud::updateRect(){
+	
+	Vec2f anchorPos = anchorPosition();
+	
+	if(player.Interface & INTER_INVENTORYALL) {
+		m_rect = Rectf(anchorPos - Vec2f(0, (player.bag - 1) * m_bagBackgroundSize.y * m_scale), 
+		                                 m_bagBackgroundSize.x * m_scale, player.bag * m_bagBackgroundSize.y * m_scale);
+	} else {
+		m_rect = Rectf(anchorPos, m_bagBackgroundSize.x * m_scale, m_bagBackgroundSize.y * m_scale);
+	}
+}
+
 bool PlayerInventoryHud::updateInput() {
 	Vec2f anchorPos = anchorPosition();
 	
@@ -170,7 +182,7 @@ void PlayerInventoryHud::CalculateInventoryCoordinates() {
 //-----------------------------------------------------------------------------
 void PlayerInventoryHud::ARX_INTERFACE_DrawInventory(size_t bag, Vec2i i)
 {
-	fDecPulse += g_framedelay * 0.5f;
+	fDecPulse += toMs(g_platformTime.lastFrameDuration()) * 0.5f;
 	
 	Vec2f anchorPos = anchorPosition();
 	

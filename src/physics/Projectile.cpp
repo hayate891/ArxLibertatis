@@ -60,9 +60,8 @@ static bool IsPointInField(const Vec3f & pos) {
 		if(spell && spell->m_type == SPELL_CREATE_FIELD) {
 			const CreateFieldSpell * sp = static_cast<const CreateFieldSpell *>(spell);
 			
-			if(ValidIONum(sp->m_entity)) {
-				Entity * pfrm = entities[sp->m_entity];
-				
+			Entity * pfrm = entities.get(sp->m_entity);
+			if(pfrm) {
 				Cylinder cyl = Cylinder(pos + Vec3f(0.f, 17.5f, 0.f), 35.f, -35.f);
 				
 				if(CylinderPlatformCollide(cyl, pfrm)) {
@@ -75,8 +74,8 @@ static bool IsPointInField(const Vec3f & pos) {
 	return false;
 }
 
-static void ARX_THROWN_OBJECT_Kill(long num) {
-	if(num >= 0 && size_t(num) < MAX_THROWN_OBJECTS) {
+static void ARX_THROWN_OBJECT_Kill(size_t num) {
+	if(num < MAX_THROWN_OBJECTS) {
 		g_projectiles[num].flags = 0;
 		delete g_projectiles[num].m_trail;
 		g_projectiles[num].m_trail = NULL;
@@ -106,7 +105,7 @@ static long ARX_THROWN_OBJECT_GetFree() {
 	}
 
 	if(latest_obj >= 0) {
-		ARX_THROWN_OBJECT_Kill(latest_obj);
+		ARX_THROWN_OBJECT_Kill(size_t(latest_obj));
 		return latest_obj;
 	}
 
@@ -143,13 +142,12 @@ void ARX_THROWN_OBJECT_Throw(EntityHandle source, const Vec3f & position, const 
 	projectile.creation_time = arxtime.now();
 	projectile.flags |= ATO_EXIST | ATO_MOVING;
 	
-	if(source == EntityHandle_Player
-	   && ValidIONum(player.equiped[EQUIP_SLOT_WEAPON])
-	) {
-		Entity * tio = entities[player.equiped[EQUIP_SLOT_WEAPON]];
-		
-		if(tio->ioflags & IO_FIERY)
-			projectile.flags |= ATO_FIERY;
+	if(source == EntityHandle_Player) {
+		Entity * tio = entities.get(player.equiped[EQUIP_SLOT_WEAPON]);
+		if(tio) {
+			if(tio->ioflags & IO_FIERY)
+				projectile.flags |= ATO_FIERY;
+		}
 	}
 }
 
@@ -224,9 +222,9 @@ static float ARX_THROWN_ComputeDamages(const Projectile & projectile, EntityHand
 	}
 
 	if(io_target == entities.player()) {
-		if(ValidIONum(player.equiped[EQUIP_SLOT_ARMOR])) {
-			Entity * io = entities[player.equiped[EQUIP_SLOT_ARMOR]];
-			if(io && !io->armormaterial.empty()) {
+		Entity * io = entities.get(player.equiped[EQUIP_SLOT_ARMOR]);
+		if(io) {
+			if(!io->armormaterial.empty()) {
 				amat = &io->armormaterial;
 			}
 		}
@@ -269,18 +267,18 @@ static EERIEPOLY * CheckArrowPolyCollision(const Vec3f & start, const Vec3f & en
 	pol.v[1] = end;
 
 	// TODO copy-paste background tiles
-	int tilex = int(end.x * ACTIVEBKG->Xmul);
-	int tilez = int(end.z * ACTIVEBKG->Zmul);
+	int tilex = int(end.x * ACTIVEBKG->m_mul.x);
+	int tilez = int(end.z * ACTIVEBKG->m_mul.y);
 	int radius = 2;
 	
 	int minx = std::max(tilex - radius, 0);
-	int maxx = std::min(tilex + radius, ACTIVEBKG->Xsize - 1);
+	int maxx = std::min(tilex + radius, ACTIVEBKG->m_size.x - 1);
 	int minz = std::max(tilez - radius, 0);
-	int maxz = std::min(tilez + radius, ACTIVEBKG->Zsize - 1);
+	int maxz = std::min(tilez + radius, ACTIVEBKG->m_size.y - 1);
 	
 	for(int z = minz; z <= maxz; z++)
 	for(int x = minx; x <= maxx; x++) {
-		const EERIE_BKG_INFO & feg = ACTIVEBKG->fastdata[x][z];
+		const BackgroundTileData & feg = ACTIVEBKG->m_tileData[x][z];
 		for(long l = 0; l < feg.nbpolyin; l++) {
 			EERIEPOLY * ep = feg.polyin[l];
 
@@ -369,7 +367,7 @@ void ARX_THROWN_OBJECT_Manage(float time_offset)
 		{
 		// Is Object Visible & Near ?
 
-		EERIE_BKG_INFO * bkgData = getFastBackgroundData(projectile.position.x, projectile.position.z);
+		BackgroundTileData * bkgData = getFastBackgroundData(projectile.position.x, projectile.position.z);
 
 		if(!bkgData || !bkgData->treat) {
 			continue;
@@ -434,9 +432,9 @@ void ARX_THROWN_OBJECT_Manage(float time_offset)
 			}
 
 			// Check for collision MUST be done after DRAWING !!!!
-			long nbact = projectile.obj->actionlist.size();
+			size_t nbact = projectile.obj->actionlist.size();
 
-			for(long j = 0; j < nbact; j++) {
+			for(size_t j = 0; j < nbact; j++) {
 				float rad = GetHitValue(projectile.obj->actionlist[j].name);
 
 				if(rad == -1)
@@ -519,7 +517,7 @@ void ARX_THROWN_OBJECT_Manage(float time_offset)
 											if(target->obj->facelist[ii].facetype & POLY_HIDE)
 												continue;
 
-											short vid = target->obj->facelist[ii].vid[0];
+											unsigned short vid = target->obj->facelist[ii].vid[0];
 											float d = glm::distance(sphere.origin, target->obj->vertexlist3[vid].v);
 
 											if(d < curdist) {

@@ -36,9 +36,9 @@ public:
 	ArxDuration m_elapsed;
 	ArxDuration m_duration;
 	
-	ArxDuration ulDurationIntro;
-	ArxDuration ulDurationRender;
-	ArxDuration ulDurationOuttro;
+	ArxDuration m_durationIntro;
+	ArxDuration m_durationRender;
+	ArxDuration m_durationOuttro;
 	
 	Color3f m_colorBorder;
 	Color3f m_colorRays1;

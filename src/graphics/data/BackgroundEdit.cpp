@@ -149,19 +149,19 @@ bool TryToQuadify(EERIEPOLY * ep,EERIE_3DOBJ * eobj) {
 	float centerx = (ep->v[0].p.x + ep->v[1].p.x + ep->v[2].p.x) * (1.f/3);
 	float centerz = (ep->v[0].p.z + ep->v[1].p.z + ep->v[2].p.z) * (1.f/3);
 	
-	short tilex = centerx * ACTIVEBKG->Xmul;
-	short tilez = centerz * ACTIVEBKG->Zmul;
+	short tilex = centerx * ACTIVEBKG->m_mul.x;
+	short tilez = centerz * ACTIVEBKG->m_mul.y;
 	short radius = 1;
 	
 	short minx = std::max(tilex - radius, 0);
-	short maxx = std::min(tilex + radius, ACTIVEBKG->Xsize - 1);
+	short maxx = std::min(tilex + radius, ACTIVEBKG->m_size.x - 1);
 	short minz = std::max(tilez - radius, 0);
-	short maxz = std::min(tilez + radius, ACTIVEBKG->Zsize - 1);
+	short maxz = std::min(tilez + radius, ACTIVEBKG->m_size.y - 1);
 	
 	for(long kl = 0; kl < 2; kl++)
 	for(short z = minz; z <= maxz; z++)
 	for(short x = minx; x <= maxx; x++) {
-		EERIE_BKG_INFO *eg = &ACTIVEBKG->fastdata[x][z];
+		BackgroundTileData *eg = &ACTIVEBKG->m_tileData[x][z];
 		
 		long val1 = 0;
 
@@ -211,9 +211,9 @@ void ARX_PrepareBackgroundNRMLs() {
 	Vec3f cur_nrml;
 	float count;
 	
-	for(short z = 0; z < ACTIVEBKG->Zsize; z++)
-	for(short x = 0; x < ACTIVEBKG->Xsize; x++) {
-		EERIE_BKG_INFO * eg = &ACTIVEBKG->fastdata[x][z];
+	for(short z = 0; z < ACTIVEBKG->m_size.y; z++)
+	for(short x = 0; x < ACTIVEBKG->m_size.x; x++) {
+		BackgroundTileData * eg = &ACTIVEBKG->m_tileData[x][z];
 		for(short l = 0; l < eg->nbpoly; l++) {
 			EERIEPOLY * ep = &eg->polydata[l];
 			
@@ -239,13 +239,13 @@ void ARX_PrepareBackgroundNRMLs() {
 				short radius = 4;
 				
 				short minx = std::max(x - radius, 0);
-				short maxx = std::min(x + radius, ACTIVEBKG->Xsize - 1);
+				short maxx = std::min(x + radius, ACTIVEBKG->m_size.x - 1);
 				short minz = std::max(z - radius, 0);
-				short maxz = std::min(z + radius, ACTIVEBKG->Zsize - 1);
+				short maxz = std::min(z + radius, ACTIVEBKG->m_size.y - 1);
 				
 				for(short j2 = minz; j2 < maxz; j2++)
 				for(short i2 = minx; i2 < maxx; i2++) {
-					EERIE_BKG_INFO * eg2 = &ACTIVEBKG->fastdata[i2][j2];
+					BackgroundTileData * eg2 = &ACTIVEBKG->m_tileData[i2][j2];
 					
 					for(long kr = 0; kr < eg2->nbpoly; kr++) {
 						EERIEPOLY * ep2 = &eg2->polydata[kr];
@@ -289,9 +289,9 @@ void ARX_PrepareBackgroundNRMLs() {
 		}
 	}
 	
-	for(short z = 0; z < ACTIVEBKG->Zsize; z++)
-	for(short x = 0; x < ACTIVEBKG->Xsize; x++) {
-		EERIE_BKG_INFO * eg = &ACTIVEBKG->fastdata[x][z];
+	for(short z = 0; z < ACTIVEBKG->m_size.y; z++)
+	for(short x = 0; x < ACTIVEBKG->m_size.x; x++) {
+		BackgroundTileData * eg = &ACTIVEBKG->m_tileData[x][z];
 		for(long l = 0; l < eg->nbpoly; l++) {
 			EERIEPOLY * ep = &eg->polydata[l];
 			

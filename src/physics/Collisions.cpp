@@ -477,14 +477,14 @@ float CheckAnythingInCylinder(const Cylinder & cyl, Entity * ioo, long flags) {
 	float anything = 999999.f;
 	
 	// TODO copy-paste background tiles
-	int tilex = int(cyl.origin.x * ACTIVEBKG->Xmul);
-	int tilez = int(cyl.origin.z * ACTIVEBKG->Zmul);
-	int radius = int((cyl.radius + 100) * ACTIVEBKG->Xmul);
+	int tilex = int(cyl.origin.x * ACTIVEBKG->m_mul.x);
+	int tilez = int(cyl.origin.z * ACTIVEBKG->m_mul.y);
+	int radius = int((cyl.radius + 100) * ACTIVEBKG->m_mul.x);
 	
 	int minx = std::max(tilex - radius, 0);
-	int maxx = std::min(tilex + radius, ACTIVEBKG->Xsize - 1);
+	int maxx = std::min(tilex + radius, ACTIVEBKG->m_size.x - 1);
 	int minz = std::max(tilez - radius, 0);
-	int maxz = std::min(tilez + radius, ACTIVEBKG->Zsize - 1);
+	int maxz = std::min(tilez + radius, ACTIVEBKG->m_size.y - 1);
 	
 	for(int z = minz; z <= maxz; z++)
 	for(int x = minx; x <= maxx; x++) {
@@ -511,7 +511,7 @@ float CheckAnythingInCylinder(const Cylinder & cyl, Entity * ioo, long flags) {
 		if(nearest > std::max(82.f, cyl.radius))
 			continue;
 		
-		const EERIE_BKG_INFO & feg = ACTIVEBKG->fastdata[x][z];
+		const BackgroundTileData & feg = ACTIVEBKG->m_tileData[x][z];
 		for(long k = 0; k < feg.nbpoly; k++) {
 			const EERIEPOLY & ep = feg.polydata[k];
 
@@ -565,7 +565,10 @@ float CheckAnythingInCylinder(const Cylinder & cyl, Entity * ioo, long flags) {
 				||	(	(io->show!=SHOW_FLAG_IN_SCENE)
 					||	((io->ioflags & IO_NO_COLLISIONS)  && !(flags & CFLAG_COLLIDE_NOCOL))
 					) 
-				|| fartherThan(io->pos, cyl.origin, 1000.f)) continue;
+				|| fartherThan(io->pos, cyl.origin, 1000.f)
+			) {
+				continue;
+			}
 	
 			{
 				Cylinder & io_cyl = io->physics.cyl;
@@ -971,19 +974,20 @@ bool CheckEverythingInSphere(const Sphere & sphere, EntityHandle source, EntityH
 //except source...
 const EERIEPOLY * CheckBackgroundInSphere(const Sphere & sphere) {
 	
-	// TODO copy-paste background tiles
-	int tilex = int(sphere.origin.x * ACTIVEBKG->Xmul);
-	int tilez = int(sphere.origin.z * ACTIVEBKG->Zmul);
-	int radius = int(sphere.radius * ACTIVEBKG->Xmul) + 2;
+	ARX_PROFILE_FUNC();
+	
+	int tilex = int(sphere.origin.x * ACTIVEBKG->m_mul.x);
+	int tilez = int(sphere.origin.z * ACTIVEBKG->m_mul.y);
+	int radius = int(sphere.radius * ACTIVEBKG->m_mul.x) + 2;
 
 	int minx = std::max(tilex - radius, 0);
-	int maxx = std::min(tilex + radius, ACTIVEBKG->Xsize - 1);
+	int maxx = std::min(tilex + radius, ACTIVEBKG->m_size.x - 1);
 	int minz = std::max(tilez - radius, 0);
-	int maxz = std::min(tilez + radius, ACTIVEBKG->Zsize - 1);
+	int maxz = std::min(tilez + radius, ACTIVEBKG->m_size.y - 1);
 
 	for(int z = minz; z <= maxz; z++)
 	for(int x = minx; x <= maxx; x++) {
-		const EERIE_BKG_INFO & feg = ACTIVEBKG->fastdata[x][z];
+		const BackgroundTileData & feg = ACTIVEBKG->m_tileData[x][z];
 
 		for(long k = 0; k < feg.nbpoly; k++) {
 			const EERIEPOLY & ep = feg.polydata[k];
@@ -1008,31 +1012,10 @@ bool CheckAnythingInSphere(const Sphere & sphere, EntityHandle source, CASFlags 
 		*num = EntityHandle();
 	
 	if(!(flags & CAS_NO_BACKGROUND_COL)) {
-		ARX_PROFILE("Background Collision");
-		
-		// TODO copy-paste background tiles
-		int tilex = int(sphere.origin.x * ACTIVEBKG->Xmul);
-		int tilez = int(sphere.origin.z * ACTIVEBKG->Zmul);
-		int radius = int(sphere.radius * ACTIVEBKG->Xmul) + 2;
-		
-		int minx = std::max(tilex - radius, 0);
-		int maxx = std::min(tilex + radius, ACTIVEBKG->Xsize - 1);
-		int minz = std::max(tilez - radius, 0);
-		int maxz = std::min(tilez + radius, ACTIVEBKG->Zsize - 1);
-
-		for(int z = minz; z <= maxz; z++)
-		for(int x = minx; x <= maxx; x++) {
-			const EERIE_BKG_INFO & feg = ACTIVEBKG->fastdata[x][z];
-			for(long k = 0; k < feg.nbpoly; k++) {
-				const EERIEPOLY & ep = feg.polydata[k];
-
-				if(ep.type & (POLY_WATER | POLY_TRANS | POLY_NOCOL))
-					continue;
-
-				if(IsPolyInSphere(ep, sphere))
-					return true;
-			}
-		}	
+		const EERIEPOLY * poly = CheckBackgroundInSphere(sphere);
+		if(poly) {
+			return true;
+		}
 	}
 
 	if(flags & CAS_NO_NPC_COL)
@@ -1069,8 +1052,13 @@ bool CheckAnythingInSphere(const Sphere & sphere, EntityHandle source, CASFlags 
 		if((io->ioflags & IO_ITEM) && (flags & CAS_NO_ITEM_COL))
 			continue;
 
-		if(treatio[i].io->index() != EntityHandle_Player && source != EntityHandle_Player && validsource && HaveCommonGroup(io,entities[source]))
+		if(   treatio[i].io->index() != EntityHandle_Player
+		   && source != EntityHandle_Player
+		   && validsource
+		   && HaveCommonGroup(io, entities[source])
+		) {
 			continue;
+		}
 
 		if(io->gameFlags & GFLAG_PLATFORM) {
 			float miny = io->bbox3D.min.y;
@@ -1551,7 +1539,6 @@ bool ARX_COLLISION_Move_Cylinder(IO_PHYSICS * ip, Entity * io, float MOVE_CYLIND
 	return true;
 }
 
-// TODO visible copy-paste
 bool IO_Visible(const Vec3f & orgn, const Vec3f & dest, Vec3f * hit)
 {
 	ARX_PROFILE_FUNC();
@@ -1640,13 +1627,13 @@ bool IO_Visible(const Vec3f & orgn, const Vec3f & dest, Vec3f * hit)
 			}
 		}
 
-		long px = (long)(tmpPos.x * ACTIVEBKG->Xmul);
-		long pz = (long)(tmpPos.z * ACTIVEBKG->Zmul);
+		long px = (long)(tmpPos.x * ACTIVEBKG->m_mul.x);
+		long pz = (long)(tmpPos.z * ACTIVEBKG->m_mul.y);
 
-		if(px < 0 || px >= ACTIVEBKG->Xsize || pz < 0 || pz >= ACTIVEBKG->Zsize)
+		if(px < 0 || px >= ACTIVEBKG->m_size.x || pz < 0 || pz >= ACTIVEBKG->m_size.y)
 			break;
 
-		EERIE_BKG_INFO * eg = &ACTIVEBKG->fastdata[px][pz];
+		BackgroundTileData * eg = &ACTIVEBKG->m_tileData[px][pz];
 
 		for(long k = 0; k < eg->nbpolyin; k++) {
 			EERIEPOLY * ep = eg->polyin[k];
@@ -1676,7 +1663,7 @@ bool IO_Visible(const Vec3f & orgn, const Vec3f & dest, Vec3f * hit)
 
 void ANCHOR_BLOCK_Clear() {
 
-	EERIE_BACKGROUND * eb = ACTIVEBKG;
+	BackgroundData * eb = ACTIVEBKG;
 
 	if(!eb)
 		return;
@@ -1689,7 +1676,7 @@ void ANCHOR_BLOCK_Clear() {
 
 void ANCHOR_BLOCK_By_IO(Entity * io, long status) {
 
-	EERIE_BACKGROUND * eb = ACTIVEBKG;
+	BackgroundData * eb = ACTIVEBKG;
 
 	for(long k = 0; k < eb->nbanchors; k++) {
 		ANCHOR_DATA & ad = eb->anchors[k];

@@ -427,7 +427,7 @@ static bool ARX_CHANGELEVEL_Push_Index(long num) {
 	asi.version       = ARX_GAMESAVE_VERSION;
 	asi.nb_inter      = 0;
 	asi.nb_paths      = nbARXpaths;
-	asi.time          = arxtime.now();
+	asi.time          = toMs(arxtime.now());
 	asi.nb_lights     = 0;
 	asi.gmods_stacked = GLOBAL_MODS();
 	asi.gmods_stacked.zclip = 6400.f;
@@ -639,7 +639,7 @@ static long ARX_CHANGELEVEL_Push_Player(long level) {
 
 	memset(asp, 0, sizeof(ARX_CHANGELEVEL_PLAYER));
 
-	asp->AimTime = player.AimTime;
+	asp->AimTime = toMs(player.AimTime);
 	asp->angle = player.angle;
 	asp->armor_class = player.m_misc.armorClass;
 	asp->Attribute_Constitution = player.m_attribute.constitution;
@@ -688,7 +688,7 @@ static long ARX_CHANGELEVEL_Push_Player(long level) {
 	asp->invisibility = entities.player()->invisibility;
 
 	asp->jumpphase = player.jumpphase;
-	asp->jumpstarttime = static_cast<u32>(player.jumpstarttime); // TODO save/load time
+	asp->jumpstarttime = static_cast<u32>(toMs(player.jumpstarttime)); // TODO save/load time
 	asp->Last_Movement = player.m_lastMovement;
 	asp->level = player.level;
 	
@@ -1117,7 +1117,7 @@ static long ARX_CHANGELEVEL_Push_IO(const Entity * io, long level) {
 				ARX_CHANGELEVEL_TIMERS_SAVE * ats = (ARX_CHANGELEVEL_TIMERS_SAVE *)(dat + pos);
 				memset(ats, 0, sizeof(ARX_CHANGELEVEL_TIMERS_SAVE));
 				ats->longinfo = timer.longinfo;
-				ats->interval = timer.interval;
+				ats->interval = toMs(timer.interval);
 				util::storeString(ats->name, timer.name.c_str());
 				ats->pos = timer.pos;
 
@@ -1126,7 +1126,7 @@ static long ARX_CHANGELEVEL_Push_IO(const Entity * io, long level) {
 				else
 					ats->script = 1;
 
-				ats->remaining = (timer.start + timer.interval) - timm;
+				ats->remaining = toMs((timer.start + timer.interval) - timm);
 				arx_assert(ats->remaining <= toMs(timer.interval));
 
 				if(ats->remaining < 0)
@@ -1286,7 +1286,7 @@ static long ARX_CHANGELEVEL_Push_IO(const Entity * io, long level) {
 			as = (ARX_CHANGELEVEL_NPC_IO_SAVE *)(dat + pos);
 			memset(as, 0, sizeof(ARX_CHANGELEVEL_NPC_IO_SAVE));
 			as->absorb = io->_npcdata->absorb;
-			as->aimtime = static_cast<f32>(io->_npcdata->aimtime);
+			as->aimtime = static_cast<f32>(toMs(io->_npcdata->aimtime));
 			as->armor_class = io->_npcdata->armor_class;
 			as->behavior = io->_npcdata->behavior;
 			as->behavior_param = io->_npcdata->behavior_param;
@@ -1341,7 +1341,7 @@ static long ARX_CHANGELEVEL_Push_IO(const Entity * io, long level) {
 			as->resist_fire = io->_npcdata->resist_fire;
 			as->strike_time = io->_npcdata->strike_time;
 			as->walk_start_time = io->_npcdata->walk_start_time;
-			as->aiming_start = static_cast<s32>(io->_npcdata->aiming_start); // TODO save/load time
+			as->aiming_start = static_cast<s32>(toMs(io->_npcdata->aiming_start)); // TODO save/load time
 			as->npcflags = io->_npcdata->npcflags;
 			as->pathfind = IO_PATHFIND();
 
@@ -1629,7 +1629,7 @@ static long ARX_CHANGELEVEL_Pop_Player() {
 	const ARX_CHANGELEVEL_PLAYER * asp = reinterpret_cast<const ARX_CHANGELEVEL_PLAYER *>(dat + pos);
 	pos += sizeof(ARX_CHANGELEVEL_PLAYER);
 	
-	player.AimTime = asp->AimTime;
+	player.AimTime = PlatformDurationMs(asp->AimTime);
 	player.angle = asp->angle;
 	player.desiredangle = player.angle;
 	
@@ -2159,7 +2159,7 @@ static Entity * ARX_CHANGELEVEL_Pop_IO(const std::string & idString, EntityInsta
 			if(remaining > ArxDurationMs(ats->interval)) {
 				LogWarning << "Found bad script timer " << scr_timer[num].name
 				           << " for entity " << io->idString() << " in save file: remaining time ("
-				           << remaining << "ms) > interval (" << ats->interval << "ms) " << ats->flags;
+				           << toMs(remaining) << "ms) > interval (" << ats->interval << "ms) " << ats->flags;
 				remaining = ArxDurationMs(ats->interval);
 			}
 			
@@ -2821,7 +2821,7 @@ bool ARX_CHANGELEVEL_Save(const std::string & name, const fs::path & savefile) {
 	pld.level = CURRENTLEVEL;
 	util::storeString(pld.name, name.c_str());
 	pld.version = ARX_GAMESAVE_VERSION;
-	pld.time = static_cast<u32>(arxtime.now()); // TODO save/load time
+	pld.time = static_cast<u32>(toMs(arxtime.now())); // TODO save/load time
 	
 	const char * dat = reinterpret_cast<const char *>(&pld);
 	g_currentSavedGame->save("pld", dat, sizeof(ARX_CHANGELEVEL_PLAYER_LEVEL_DATA));

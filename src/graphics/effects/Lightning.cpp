@@ -59,7 +59,7 @@ ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 #include "graphics/particle/ParticleEffects.h"
 #include "graphics/particle/ParticleParams.h"
 #include "graphics/spells/Spells05.h"
-
+#include "math/RandomVector.h"
 #include "physics/Collisions.h"
 
 #include "scene/Interactive.h"
@@ -104,7 +104,7 @@ CLightning::CLightning()
 	, m_fLengthMax(40.0f)
 	, m_fAngleMin(5.0f, 5.0f, 5.0f)
 	, m_fAngleMax(32.0f, 32.0f, 32.0f)
-	, m_iTTL(0)
+	, m_iTTL(ArxDuration_ZERO)
 {
 	SetDuration(ArxDurationMs(2000));
 	m_elapsed = m_duration + ArxDurationMs(1);
@@ -257,7 +257,7 @@ void CLightning::ReCreate(float rootSize)
 		BuildS(&LInfo);
 	}
 	
-	m_iTTL = Random::get(500, 1500);
+	m_iTTL = ArxDurationMs(Random::get(500, 1500));
 }
 
 void CLightning::Update(ArxDuration timeDelta)
@@ -275,7 +275,7 @@ void CLightning::Render()
 	if(m_elapsed >= m_duration)
 		return;
 	
-	if(m_iTTL <= 0) {
+	if(m_iTTL <= ArxDuration_ZERO) {
 		fTotoro = 0;
 		fMySize = 2;
 		ReCreate(8);
@@ -295,7 +295,7 @@ void CLightning::Render()
 	}
 	
 	float f = 1.5f * fMySize;
-	m_cnodetab[0].f = randomVec(-f, f);
+	m_cnodetab[0].f = arx::randomVec(-f, f);
 	
 	RenderMaterial mat;
 	mat.setCulling(CullNone);
@@ -309,7 +309,7 @@ void CLightning::Render()
 		
 		Vec3f astart = m_cnodetab[node.parent].pos + m_cnodetab[node.parent].f;
 		float temp = 1.5f * fMySize;
-		Vec3f z_z = m_cnodetab[node.parent].f + randomVec(-temp, temp);
+		Vec3f z_z = m_cnodetab[node.parent].f + arx::randomVec(-temp, temp);
 		float zz = node.size + node.size * Random::getf(0.f, 0.3f);
 		float xx = node.size * glm::cos(glm::radians(-fbeta));
 		node.f = z_z;

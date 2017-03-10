@@ -24,6 +24,7 @@
 #include "game/Player.h"
 #include "graphics/Draw.h"
 #include "graphics/GraphicsModes.h"
+#include "graphics/Raycast.h"
 #include "graphics/Renderer.h"
 #include "graphics/effects/Fade.h"
 #include "gui/CinematicBorder.h"
@@ -33,6 +34,8 @@
 
 void update2DFX() {
 	
+	RaycastDebugClear();
+	
 	ARX_PROFILE_FUNC();
 	
 	TexturedVertex ltvv;
@@ -41,13 +44,15 @@ void update2DFX() {
 	size_t nNbInTableIO = 0;
 
 	float temp_increase = toMs(g_platformTime.lastFrameDuration()) * (1.0f/1000) * 4.f;
-
+	
+	const Vec3f camPos = ACTIVECAM->orgTrans.pos;
+	
 	bool bComputeIO = false;
 
 	for(size_t i = 0; i < g_culledDynamicLightsCount; i++) {
 		EERIE_LIGHT *el = g_culledDynamicLights[i];
 
-		EERIE_BKG_INFO * bkgData = getFastBackgroundData(el->pos.x, el->pos.z);
+		BackgroundTileData * bkgData = getFastBackgroundData(el->pos.x, el->pos.z);
 
 		if(!bkgData || !bkgData->treat) {
 			el->treat=0;
@@ -69,12 +74,11 @@ void update2DFX() {
 				ltvv.p.y < (g_size.height()-(cinematicBorder.CINEMA_DECAL * g_sizeRatio.y))
 				)
 			{
-				Vec3f vector = lv - ACTIVECAM->orgTrans.pos;
+				Vec3f vector = lv - camPos;
 				lv -= vector * (50.f / glm::length(vector));
 
 				float fZFar=ACTIVECAM->ProjectionMatrix[2][2]*(1.f/(ACTIVECAM->cdepth*fZFogEnd))+ACTIVECAM->ProjectionMatrix[3][2];
 
-				Vec3f hit;
 				Vec2s ees2dlv;
 				Vec3f ee3dlv = lv;
 
@@ -86,11 +90,11 @@ void update2DFX() {
 					bComputeIO = true;
 				}
 
-				if(ltvv.p.z > fZFar ||
-					EERIELaunchRay3(ACTIVECAM->orgTrans.pos, ee3dlv, hit, 1) ||
-					GetFirstInterAtPos(ees2dlv, 3, &ee3dlv, pTableIO, &nNbInTableIO )
-					)
-				{
+				
+				if(   ltvv.p.z > fZFar
+				   || RaycastLightFlare(camPos, el->pos)
+				   || GetFirstInterAtPos(ees2dlv, 3, &ee3dlv, pTableIO, &nNbInTableIO)
+				) {
 					el->m_flareFader -= temp_increase * 2.f;
 				} else {
 					el->m_flareFader += temp_increase * 2.f;
@@ -104,9 +108,15 @@ void update2DFX() {
 
 extern TextureContainer * tflare;
 
+
+
 void goFor2DFX() {
 	
 	ARX_PROFILE_FUNC();
+	
+	if(g_debugToggles[6]) {
+		RaycastDebugDraw();
+	}
 	
 	GRenderer->SetRenderState(Renderer::Fog, true);
 	GRenderer->SetBlendFunc(BlendOne, BlendOne);

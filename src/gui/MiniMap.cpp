@@ -93,10 +93,10 @@ void MiniMap::getData(int showLevel) {
 			float minY = std::numeric_limits<float>::max();
 			float maxY = std::numeric_limits<float>::min();
 			
-			for(int z = 0; z < m_activeBkg->Zsize; z++) {
+			for(int z = 0; z < m_activeBkg->m_size.y; z++) {
 				
-				for(int x = 0; x < m_activeBkg->Xsize; x++) {
-					const EERIE_BKG_INFO & eg = m_activeBkg->fastdata[x][z];
+				for(int x = 0; x < m_activeBkg->m_size.x; x++) {
+					const BackgroundTileData & eg = m_activeBkg->m_tileData[x][z];
 					for(int k = 0; k < eg.nbpoly; k++) {
 						const EERIEPOLY & ep = eg.polydata[k];
 						
@@ -302,7 +302,7 @@ void MiniMap::showPlayerMiniMap(int showLevel) {
 		}
 		
 		// Draw the background
-		drawBackground(showLevel, Rect(390, 135, 590, 295), start, miniMapZoom, 20.f, decal, true, 0.5f);
+		drawBackground(showLevel, miniMapRect, start, miniMapZoom, 20.f, decal, true, 0.5f);
 		
 		GRenderer->GetTextureStage(0)->setWrapMode(TextureStage::WrapRepeat);
 		
@@ -399,8 +399,8 @@ void MiniMap::showBookEntireMap(int showLevel) {
 		}
 		
 		Vec2f pos;
-		pos.x = m_mapMarkers[i].m_pos.x * 8 * ratio * m_activeBkg->Xmul * casePos.x + start.x;
-		pos.y = m_mapMarkers[i].m_pos.y * 8 * ratio * m_activeBkg->Zmul * casePos.y + start.y;
+		pos.x = m_mapMarkers[i].m_pos.x * 8 * ratio * m_activeBkg->m_mul.x * casePos.x + start.x;
+		pos.y = m_mapMarkers[i].m_pos.y * 8 * ratio * m_activeBkg->m_mul.y * casePos.y + start.y;
 		
 		float size = 5.f * ratio;
 		verts[0].color = Color(255, 0, 0, 255).toRGBA();
@@ -462,39 +462,35 @@ void MiniMap::showBookEntireMap(int showLevel) {
 void MiniMap::revealPlayerPos(int showLevel) {
 	
 	float zoom = 250.f;
+	float maxDistance = 6.0f;
 	Vec2f start = Vec2f(140.f, 120.f);
 	Vec2f cas;
 	cas.x = zoom / MINIMAP_MAX_X;
 	cas.y = zoom / MINIMAP_MAX_Z;
 	
 	Vec2f playerPos = computePlayerPos(zoom, showLevel);
+	Vec2i playerCell = Vec2i(playerPos.x / cas.x, playerPos.y / cas.y);
 	playerPos += start;
 	
-	// TODO this is inefficient - we don't really need to iterate over the whole minimap!
-	// only the area around the player will be modified
-	for(size_t z = 0; z < MINIMAP_MAX_Z; z++) {
-	for(size_t x = 0; x < MINIMAP_MAX_X; x++) {
+	Vec2i startCell = playerCell - Vec2i(glm::ceil(maxDistance / cas.x));
+	Vec2i endCell = playerCell + Vec2i(glm::ceil(maxDistance / cas.y));
+	
+	for(int z = startCell.y; z <= endCell.y; z++) {
+	for(int x = startCell.x; x <= endCell.x; x++) {
 		
 		Vec2f pos;
 		pos.x = start.x + x * cas.x;
 		pos.y = start.y + z * cas.y;
 		
 		float d = fdist(Vec2f(pos.x + cas.x * 0.5f, pos.y), playerPos);
-		if(d > 6.f) {
+		if(d >= maxDistance) {
 			continue;
 		}
 		
-		float vv = (6 - d) * (1.f / 6);
+		float revealPercent = (maxDistance - d) * (1.f / maxDistance);
+		revealPercent = arx::clamp(revealPercent * 2.0f, 0.0f, 1.0f);
 		
-		if(vv >= 0.5f) {
-			vv = 1.f;
-		} else if(vv > 0.f) {
-			vv = vv * 2.f;
-		} else {
-			vv = 0.f;
-		}
-		
-		int r = vv * 255.f;
+		int r = revealPercent * 255.f;
 		
 		int ucLevel = std::max(r, (int)m_levels[showLevel].m_revealed[x][z]);
 		m_levels[showLevel].m_revealed[x][z] = checked_range_cast<unsigned char>(ucLevel);
@@ -568,8 +564,8 @@ void MiniMap::drawBackground(int showLevel, Rect boundaries, Vec2f start, float 
 	for(int x = -2; x < int(MINIMAP_MAX_X) + 2; x++) {
 		
 		Vec2f v3;
-		v3.x = float(x) * float(m_activeBkg->Xdiv) * m_mod.x;
-		v3.y = float(z) * float(m_activeBkg->Zdiv) * m_mod.y;
+		v3.x = float(x) * float(m_activeBkg->m_tileSize.x) * m_mod.x;
+		v3.y = float(z) * float(m_activeBkg->m_tileSize.y) * m_mod.y;
 		
 		Vec2f v4;
 		v4.x = (v3.x * div) * d.x;
@@ -702,9 +698,9 @@ void MiniMap::drawPlayer(float playerSize, Vec2f playerPos, bool alphaBlending) 
 		verts[k].p.z = 0.00001f;
 	}
 	
-	Vec2f r;
-	r.x = 0.f;
-	r.y = -playerSize * 1.8f;
+	Vec2f r1;
+	r1.x = 0.f;
+	r1.y = -playerSize * 1.8f;
 	Vec2f r2;
 	r2.x = -playerSize * (1.0f / 2);
 	r2.y = playerSize;
@@ -718,8 +714,8 @@ void MiniMap::drawPlayer(float playerSize, Vec2f playerPos, bool alphaBlending) 
 	
 	verts[0].p.x = (playerPos.x + r2.x * ca + r2.y * sa) * g_sizeRatio.x;
 	verts[0].p.y = (playerPos.y + r2.y * ca - r2.x * sa) * g_sizeRatio.y;
-	verts[1].p.x = (playerPos.x + r.x * ca + r.y * sa) * g_sizeRatio.x;
-	verts[1].p.y = (playerPos.y + r.y * ca - r.x * sa) * g_sizeRatio.y;
+	verts[1].p.x = (playerPos.x + r1.x * ca + r1.y * sa) * g_sizeRatio.x;
+	verts[1].p.y = (playerPos.y + r1.y * ca - r1.x * sa) * g_sizeRatio.y;
 	verts[2].p.x = (playerPos.x + r3.x * ca + r3.y * sa) * g_sizeRatio.x;
 	verts[2].p.y = (playerPos.y + r3.y * ca - r3.x * sa) * g_sizeRatio.y;
 	
@@ -882,6 +878,6 @@ MiniMap::MapMarkerData MiniMap::mapMarkerGet(size_t id) {
 	return m_mapMarkers[id];
 }
 
-void MiniMap::setActiveBackground(EERIE_BACKGROUND *activeBkg) {
+void MiniMap::setActiveBackground(BackgroundData *activeBkg) {
 	m_activeBkg = activeBkg;
 }

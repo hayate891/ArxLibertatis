@@ -41,13 +41,13 @@
 #include "scene/Interactive.h"
 #include "scene/Object.h"
 
-bool MagicSightSpell::CanLaunch()
-{
+bool MagicSightSpell::CanLaunch() {
+	
 	return !spells.ExistAnyInstanceForThisCaster(m_type, m_caster);
 }
 
-void MagicSightSpell::Launch()
-{
+void MagicSightSpell::Launch() {
+	
 	m_fManaCostPerSecond = 0.36f;
 	m_hasDuration = true;
 	m_duration = (m_launchDuration > ArxDurationMs(-1)) ? m_launchDuration : ArxDurationMs(6000000);
@@ -60,13 +60,17 @@ void MagicSightSpell::Launch()
 	}
 }
 
-void MagicSightSpell::End()
-{
+void MagicSightSpell::End() {
+	
 	if(m_caster == EntityHandle_Player) {
 		player.m_improve = false;
 		ARX_SOUND_Stop(m_snd_loop);
 	}
-	ARX_SOUND_PlaySFX(SND_SPELL_VISION_START, &entities[m_caster]->pos);
+	
+	Entity * caster = entities.get(m_caster);
+	if(caster) {
+		ARX_SOUND_PlaySFX(SND_SPELL_VISION_START, &caster->pos);
+	}
 }
 
 void MagicSightSpell::Update() {
@@ -90,7 +94,7 @@ static void LaunchMagicMissileExplosion(const Vec3f & _ePos, bool mrCheat) {
 	ParticleSystem * pPS = new ParticleSystem();
 	pPS->SetParams(cp);
 	pPS->SetPos(_ePos);
-	pPS->Update(0);
+	pPS->Update(ArxDuration_ZERO);
 	
 	EERIE_LIGHT * light = dynLightCreate();
 	if(light) {
@@ -123,10 +127,10 @@ MagicMissileSpell::MagicMissileSpell()
 
 MagicMissileSpell::~MagicMissileSpell() {
 	
-	for(size_t i = 0; i < pTab.size(); i++) {
-		delete pTab[i];
+	for(size_t i = 0; i < m_missiles.size(); i++) {
+		delete m_missiles[i];
 	}
-	pTab.clear();
+	m_missiles.clear();
 }
 
 void MagicMissileSpell::Launch() {
@@ -196,7 +200,7 @@ void MagicMissileSpell::Launch() {
 		number = glm::clamp(long(m_level + 1) / 2, 1l, 5l);
 	}
 	
-	pTab.reserve(number);
+	m_missiles.reserve(number);
 	
 	for(size_t i = 0; i < size_t(number); i++) {
 		CMagicMissile * missile = NULL;
@@ -206,7 +210,7 @@ void MagicMissileSpell::Launch() {
 			missile = new MrMagicMissileFx();
 		}
 		
-		pTab.push_back(missile);
+		m_missiles.push_back(missile);
 		
 		Anglef angles(pitch, yaw, 0.f);
 		
@@ -246,20 +250,21 @@ void MagicMissileSpell::Launch() {
 
 void MagicMissileSpell::End() {
 	
-	for(size_t i = 0; i < pTab.size(); i++) {
-		delete pTab[i];
+	for(size_t i = 0; i < m_missiles.size(); i++) {
+		delete m_missiles[i];
 	}
-	pTab.clear();
+	m_missiles.clear();
 }
 
 void MagicMissileSpell::Update() {
 	
 	
-	for(size_t i = 0; i < pTab.size(); i++) {
-		CMagicMissile * missile = pTab[i];
+	for(size_t i = 0; i < m_missiles.size(); i++) {
+		CMagicMissile * missile = m_missiles[i];
 		
-		if(missile->bExplo)
+		if(missile->bExplo) {
 			continue;
+		}
 			
 		Sphere sphere = Sphere(missile->eCurPos, 10.f);
 		
@@ -290,27 +295,29 @@ void MagicMissileSpell::Update() {
 		}
 	}
 	
-	for(size_t i = 0 ; i < pTab.size() ; i++) {
-		pTab[i]->Update(ArxDurationMs(g_framedelay));
+	for(size_t i = 0 ; i < m_missiles.size() ; i++) {
+		m_missiles[i]->Update(ArxDurationMs(g_framedelay));
 	}
 	
 	{ // CheckAllDestroyed
 		long nbmissiles	= 0;
 		
-		for(size_t i = 0; i < pTab.size(); i++) {
-			CMagicMissile *pMM = pTab[i];
-			if(pMM->bMove)
+		for(size_t i = 0; i < m_missiles.size(); i++) {
+			CMagicMissile *pMM = m_missiles[i];
+			if(pMM->bMove) {
 				nbmissiles++;
+			}
 		}
 		
-		if(nbmissiles == 0)
+		if(nbmissiles == 0) {
 			m_duration = ArxDuration_ZERO;
+		}
 	}
 	
-	for(size_t i = 0; i < pTab.size(); i++) {
-		pTab[i]->Render();
+	for(size_t i = 0; i < m_missiles.size(); i++) {
+		m_missiles[i]->Render();
 		
-		CMagicMissile * pMM = pTab[i];
+		CMagicMissile * pMM = m_missiles[i];
 		
 		EERIE_LIGHT * el = lightHandleGet(pMM->lLightId);
 		if(el) {
@@ -329,8 +336,8 @@ IgnitSpell::IgnitSpell()
 	
 }
 
-void IgnitSpell::Launch()
-{
+void IgnitSpell::Launch() {
+	
 	m_duration = ArxDurationMs(500);
 	
 	if(m_hand_group != ActionPoint()) {
@@ -426,13 +433,14 @@ void IgnitSpell::End() {
 	m_lights.clear();
 }
 
-void IgnitSpell::Update()
-{
+void IgnitSpell::Update() {
+	
 	if(m_elapsed < m_duration) {
-		float a = float(m_elapsed) / float(m_duration);
+		float a = m_elapsed / m_duration;
 		
-		if(a >= 1.f)
+		if(a >= 1.f) {
 			a = 1.f;
+		}
 		
 		std::vector<T_LINKLIGHTTOFX>::iterator itr;
 		for(itr = m_lights.begin(); itr != m_lights.end(); ++itr) {
@@ -451,12 +459,13 @@ void IgnitSpell::Update()
 		}
 	}
 	
-	if(!arxtime.is_paused())
-		m_elapsed += g_framedelay;
+	if(!arxtime.is_paused()) {
+		m_elapsed += ArxDurationMs(g_framedelay);
+	}
 }
 
-void DouseSpell::Launch()
-{
+void DouseSpell::Launch() {
+	
 	m_duration = ArxDurationMs(500);
 	
 	Vec3f target;
@@ -547,8 +556,8 @@ void DouseSpell::Update() {
 	
 }
 
-void ActivatePortalSpell::Launch()
-{
+void ActivatePortalSpell::Launch() {
+	
 	ARX_SOUND_PlayInterface(SND_SPELL_ACTIVATE_PORTAL);
 	
 	m_duration = ArxDurationMs(20);

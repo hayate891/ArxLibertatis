@@ -19,8 +19,6 @@
 
 #include "game/magic/spells/SpellsLvl05.h"
 
-#include <glm/gtc/random.hpp>
-
 #include "core/Application.h"
 #include "core/Config.h"
 #include "core/Core.h"
@@ -36,6 +34,7 @@
 #include "graphics/particle/Particle.h"
 #include "graphics/particle/ParticleEffects.h"
 #include "graphics/spells/Spells05.h"
+#include "math/RandomVector.h"
 #include "physics/Collisions.h"
 #include "scene/GameSound.h"
 #include "scene/Interactive.h"
@@ -44,11 +43,11 @@
 RuneOfGuardingSpell::RuneOfGuardingSpell()
 	: SpellBase()
 	, tex_p2(NULL)
-	, ulCurrentTime(0)
+	, m_elapsed(ArxDuration_ZERO)
 {}
 
-void RuneOfGuardingSpell::Launch()
-{
+void RuneOfGuardingSpell::Launch() {
+	
 	spells.endByCaster(m_caster, SPELL_RUNE_OF_GUARDING);
 	
 	ARX_SOUND_PlaySFX(SND_SPELL_RUNE_OF_GUARDING);
@@ -78,7 +77,7 @@ void RuneOfGuardingSpell::End() {
 
 void RuneOfGuardingSpell::Update() {
 	
-	ulCurrentTime += g_framedelay;
+	m_elapsed += ArxDurationMs(g_framedelay);
 	
 	EERIE_LIGHT * light = lightHandleGet(m_light);
 	if(light) {
@@ -100,13 +99,13 @@ void RuneOfGuardingSpell::Update() {
 	Anglef stiteangle;
 	Color3f stitecolor;
 	
-	float stiteangleb = float(ulCurrentTime) * 0.01f;
+	float stiteangleb = toMs(m_elapsed) * 0.01f;
 	stiteangle.setPitch(0);
 	stiteangle.setRoll(0);
 	
 	stiteangle.setYaw(stiteangleb * 0.1f);
 	stitecolor = Color3f(0.4f, 0.4f, 0.6f);
-	float scale = std::sin(ulCurrentTime * 0.015f);
+	float scale = std::sin(toMs(m_elapsed) * 0.015f);
 	Vec3f stitescale = Vec3f(1.f, -0.1f, 1.f);
 	
 	Draw3DObject(slight, stiteangle, pos, stitescale, stitecolor, mat);
@@ -129,8 +128,8 @@ void RuneOfGuardingSpell::Update() {
 			break;
 		}
 		
-		pd->ov = pos + Vec3f(Random::getf(-40.f, 40.f), 0.f, Random::getf(-40.f, 40.f));
-		pd->move = Vec3f(Random::getf(-0.8f, 0.8f), Random::getf(-4.f, 0.f), Random::getf(-0.8f, 0.8f));
+		pd->ov = pos + arx::randomOffsetXZ(40.f);
+		pd->move = arx::linearRand(Vec3f(-0.8f, -4.f, -0.8f), Vec3f(0.8f, 0.f, 0.8f));
 		pd->scale = Vec3f(-0.1f);
 		pd->tolive = Random::getu(2600, 3200);
 		pd->tc = tex_p2;
@@ -159,12 +158,12 @@ Vec3f RuneOfGuardingSpell::getPosition() {
 
 LevitateSpell::LevitateSpell()
 	: SpellBase()
-	, ulCurrentTime(0)
+	, m_elapsed(ArxDuration_ZERO)
 	, m_baseRadius(50.f)
 {}
 
-void LevitateSpell::Launch()
-{
+void LevitateSpell::Launch() {
+	
 	spells.endByCaster(m_caster, SPELL_LEVITATE);
 	
 	if(m_caster == EntityHandle_Player) {
@@ -200,10 +199,15 @@ void LevitateSpell::Launch()
 	m_targets.push_back(m_target);
 }
 
-void LevitateSpell::End()
-{
+void LevitateSpell::End() {
+	
 	ARX_SOUND_Stop(m_snd_loop);
-	ARX_SOUND_PlaySFX(SND_SPELL_LEVITATE_END, &entities[m_target]->pos);
+	
+	Entity * target = entities.get(m_target);
+	if(target) {
+		ARX_SOUND_PlaySFX(SND_SPELL_LEVITATE_END, &target->pos);
+	}
+	
 	m_targets.clear();
 	
 	if(m_target == EntityHandle_Player)
@@ -212,7 +216,7 @@ void LevitateSpell::End()
 
 void LevitateSpell::Update() {
 	
-	ulCurrentTime += g_framedelay;
+	m_elapsed += ArxDurationMs(g_framedelay);
 	
 	Vec3f target;
 
@@ -228,8 +232,8 @@ void LevitateSpell::Update() {
 	float coneScale = 0.f;
 	int dustParticles = 0;
 	
-	if(ulCurrentTime < 1000) {
-		coneScale = ulCurrentTime / 1000.f;
+	if(m_elapsed < ArxDurationMs(1000)) {
+		coneScale = toMs(m_elapsed) / 1000.f;
 		dustParticles = 3;
 	} else {
 		coneScale = 1.f;
@@ -259,15 +263,15 @@ void LevitateSpell::createDustParticle() {
 		return;
 	}
 	
-	Vec2f pos = glm::circularRand(m_baseRadius);
+	Vec2f pos = arx::circularRand(m_baseRadius);
 	
 	pd->ov = m_pos + Vec3f(pos.x, 0.f, pos.y);
 	float t = fdist(pd->ov, m_pos);
-	pd->move = Vec3f(Random::getf(5.f, 10.f) * ((pd->ov.x - m_pos.x) / t), Random::getf(0.f, 3.f),
-	                 Random::getf(5.f, 10.f) * ((pd->ov.z - m_pos.z) / t));
+	Vec3f moveFactor = arx::linearRand(Vec3f(5.f, 0.f, 5.f), Vec3f(10.f, 3.f, 10.f));
+	pd->move = moveFactor * Vec3f((pd->ov.x - m_pos.x) / t, 1.f, (pd->ov.z - m_pos.z) / t);
 	pd->siz = Random::getf(30.f, 60.f);
 	pd->tolive = 3000;
-	pd->timcreation = -(long(arxtime.now()) + 3000l); // TODO WTF
+	pd->timcreation = -(toMs(arxtime.now()) + 3000l); // TODO WTF
 	pd->m_flags = FIRE_TO_SMOKE | FADE_IN_AND_OUT | ROTATING | DISSIPATING;
 	pd->m_rotation = 0.0000001f;
 }
@@ -276,11 +280,11 @@ void LevitateSpell::createDustParticle() {
 
 CurePoisonSpell::CurePoisonSpell()
 	: SpellBase()
-	, m_currentTime(0)
+	, m_elapsed(0)
 {}
 
-void CurePoisonSpell::Launch()
-{
+void CurePoisonSpell::Launch() {
+	
 	if(m_caster == EntityHandle_Player) {
 		m_target = EntityHandle_Player;
 	}
@@ -289,8 +293,7 @@ void CurePoisonSpell::Launch()
 	if(m_target == EntityHandle_Player) {
 		player.poison -= std::min(player.poison, cure);
 		ARX_SOUND_PlaySFX(SND_SPELL_CURE_POISON);
-	} else if (ValidIONum(m_target)) {
-		Entity * io = entities[m_target];
+	} else if(Entity * io = entities.get(m_target)) {
 		if(io->ioflags & IO_NPC) {
 			io->_npcdata->poisonned -= std::min(io->_npcdata->poisonned, cure);
 		}
@@ -320,16 +323,16 @@ void CurePoisonSpell::End() {
 
 void CurePoisonSpell::Update() {
 	
-	m_currentTime += g_framedelay;
+	m_elapsed += ArxDurationMs(g_framedelay);
 	
 	m_pos = entities[m_target]->pos;
 	
 	if(m_target == EntityHandle_Player)
 		m_pos.y += 200;
 	
-	long ff = m_duration - m_currentTime;
+	ArxDuration ff = m_duration - m_elapsed;
 	
-	if(ff < 1500) {
+	if(ff < ArxDurationMs(1500)) {
 		m_particles.m_parameters.m_spawnFlags = PARTICLE_CIRCULAR;
 		m_particles.m_parameters.m_gravity = Vec3f_ZERO;
 
@@ -349,7 +352,7 @@ void CurePoisonSpell::Update() {
 	}
 
 	m_particles.SetPos(m_pos);
-	m_particles.Update(g_framedelay);
+	m_particles.Update(ArxDurationMs(g_framedelay));
 	
 	EERIE_LIGHT * light = dynLightCreate(m_light);
 	if(light) {
@@ -373,8 +376,8 @@ RepelUndeadSpell::RepelUndeadSpell()
 	, tex_p2(NULL)
 {}
 
-void RepelUndeadSpell::Launch()
-{
+void RepelUndeadSpell::Launch() {
+	
 	spells.endByCaster(m_caster, SPELL_REPEL_UNDEAD);
 	
 	if(m_caster == EntityHandle_Player) {
@@ -441,10 +444,10 @@ void RepelUndeadSpell::Update() {
 		}
 		
 		// XXX was this supposed to be sphericalRand ?
-		Vec2f d = glm::diskRand(vv);
+		Vec2f d = arx::diskRand(vv);
 		
 		pd->ov = m_pos + Vec3f(d.x, 0.f, d.y);
-		pd->move = Vec3f(Random::getf(-0.8f, 0.8f), Random::getf(-4.f, 0.f), Random::getf(-0.8f, 0.8f));
+		pd->move = arx::linearRand(Vec3f(-0.8f, -4.f, -0.8f), Vec3f(0.8f, 0.f, 0.8f));
 		pd->scale = Vec3f(-0.1f);
 		pd->tolive = Random::getu(2600, 3200);
 		pd->tc = tex_p2;
@@ -480,8 +483,8 @@ PoisonProjectileSpell::~PoisonProjectileSpell() {
 	m_projectiles.clear();
 }
 
-void PoisonProjectileSpell::Launch()
-{
+void PoisonProjectileSpell::Launch() {
+	
 	ARX_SOUND_PlaySFX(SND_SPELL_POISON_PROJECTILE_LAUNCH,
 	                  &m_caster_pos);
 	
@@ -590,7 +593,7 @@ void PoisonProjectileSpell::Update() {
 
 		AddPoisonFog(projectile->eCurPos, m_level + 7);
 
-		if(m_timcreation + 1600 < arxtime.now()) {
+		if(m_timcreation + ArxDurationMs(1600) < arxtime.now()) {
 			
 			DamageParameters damage;
 			damage.pos = projectile->eCurPos;
@@ -628,7 +631,7 @@ void PoisonProjectileSpell::AddPoisonFog(const Vec3f & pos, float power) {
 		float speed = 1.f;
 		float fval = speed * 0.2f;
 		pd->m_flags = FADE_IN_AND_OUT | ROTATING | DISSIPATING;
-		pd->ov = pos + randomVec(-100.f, 100.f);
+		pd->ov = pos + arx::randomVec(-100.f, 100.f);
 		pd->scale = Vec3f(8.f, 8.f, 10.f);
 		pd->move = Vec3f((speed - Random::getf()) * fval, (speed - speed * Random::getf()) * (1.f / 15),
 		                 (speed - Random::getf()) * fval);

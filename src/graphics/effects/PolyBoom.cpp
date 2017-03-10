@@ -101,18 +101,18 @@ void PolyBoomAddScorch(const Vec3f & poss) {
 	static TextureContainer * tc2 = TextureContainer::Load("graph/particles/boom");
 	
 	// TODO copy-paste background tiles
-	int tilex = int(poss.x * ACTIVEBKG->Xmul);
-	int tilez = int(poss.z * ACTIVEBKG->Zmul);
+	int tilex = int(poss.x * ACTIVEBKG->m_mul.x);
+	int tilez = int(poss.z * ACTIVEBKG->m_mul.y);
 	int radius = 3;
 	
 	int minx = std::max(tilex - radius, 0);
-	int maxx = std::min(tilex + radius, ACTIVEBKG->Xsize - 1);
+	int maxx = std::min(tilex + radius, ACTIVEBKG->m_size.x - 1);
 	int minz = std::max(tilez - radius, 0);
-	int maxz = std::min(tilez + radius, ACTIVEBKG->Zsize - 1);
+	int maxz = std::min(tilez + radius, ACTIVEBKG->m_size.y - 1);
 	
 	for(int z = minz; z <= maxz; z++)
 	for(int x = minx; x <= maxx; x++) {
-		EERIE_BKG_INFO & eg = ACTIVEBKG->fastdata[x][z];
+		BackgroundTileData & eg = ACTIVEBKG->m_tileData[x][z];
 		for(long l = 0; l < eg.nbpoly; l++) {
 			EERIEPOLY * ep = &eg.polydata[l];
 			
@@ -264,18 +264,18 @@ void PolyBoomAddSplat(const Sphere & sp, const Color3f & col, long flags) {
 	}
 	
 	// TODO copy-paste background tiles
-	int tilex = int(poss.x * ACTIVEBKG->Xmul);
-	int tilez = int(poss.z * ACTIVEBKG->Zmul);
+	int tilex = int(poss.x * ACTIVEBKG->m_mul.x);
+	int tilez = int(poss.z * ACTIVEBKG->m_mul.y);
 	int radius = 3;
 	
 	int minx = std::max(tilex - radius, 0);
-	int maxx = std::min(tilex + radius, ACTIVEBKG->Xsize - 1);
+	int maxx = std::min(tilex + radius, ACTIVEBKG->m_size.x - 1);
 	int minz = std::max(tilez - radius, 0);
-	int maxz = std::min(tilez + radius, ACTIVEBKG->Zsize - 1);
+	int maxz = std::min(tilez + radius, ACTIVEBKG->m_size.y - 1);
 	
 	for(int z = minz; z <= maxz; z++)
 	for(int x = minx; x <= maxx; x++) {
-		EERIE_BKG_INFO *eg = &ACTIVEBKG->fastdata[x][z];
+		BackgroundTileData *eg = &ACTIVEBKG->m_tileData[x][z];
 		
 		for(long l = 0; l < eg->nbpolyin; l++) {
 			EERIEPOLY *ep = eg->polyin[l];
@@ -375,14 +375,14 @@ void PolyBoomDraw() {
 		
 		// FIXME what exactly does pb.type do ?
 		if(pb.type & 128) {
-			if(pb.timecreation - g_framedelay > 0) {
-				float fCalc = pb.timecreation - g_framedelay;
-				pb.timecreation = ArxInstant(fCalc);
+			if(toMs(pb.timecreation) - g_framedelay > 0) {
+				float fCalc = toMs(pb.timecreation) - g_framedelay;
+				pb.timecreation = ArxInstantMs(fCalc);
 			}
 			
-			if(pb.timecreation - g_framedelay > 0) {
-				float fCalc =  pb.timecreation - g_framedelay;
-				pb.timecreation = ArxInstant(fCalc);
+			if(toMs(pb.timecreation) - g_framedelay > 0) {
+				float fCalc =  toMs(pb.timecreation) - g_framedelay;
+				pb.timecreation = ArxInstantMs(fCalc);
 			}
 		}
 		
@@ -415,7 +415,7 @@ void PolyBoomDraw() {
 			
 			case 0: { // Scorch mark
 				
-				float tt = t / float(pb.tolive) * 0.8f;
+				float tt = toMs(t) / float(toMs(pb.tolive)) * 0.8f;
 				ColorRGBA col = (player.m_improve ? (Color3f::red * (tt*.5f)) : Color3f::gray(tt)).toRGB();
 				
 				TexturedVertexUntransformed ltv[4];
@@ -444,8 +444,8 @@ void PolyBoomDraw() {
 			
 			case 1: { // Blood
 				
-				float div = 1.f / float(pb.tolive);
-				float tt = t * div;
+				float div = 1.f / toMs(pb.tolive);
+				float tt = toMs(t) * div;
 				float tr = std::max(1.f, tt * 2 - 0.5f);
 				ColorRGBA col = Color4f(pb.rgb * tt, glm::clamp(tt * 1.5f, 0.f, 1.f)).toRGBA();
 				
@@ -471,8 +471,8 @@ void PolyBoomDraw() {
 			
 			case 2: { // Water
 				
-				float div = 1.f / float(pb.tolive);
-				float tt = t * div;
+				float div = 1.f / toMs(pb.tolive);
+				float tt = toMs(t) * div;
 				float tr = std::max(1.f, tt * 2 - 0.5f);
 				float ttt = tt * 0.5f;
 				ColorRGBA col = (pb.rgb * ttt).toRGB();

@@ -96,7 +96,7 @@ extern bool EXTERNALVIEW; // *sigh*
 
 EERIE_PORTAL_DATA * portals = NULL;
 
-static float WATEREFFECT = 0.f;
+float WATEREFFECT = 0.f;
 
 CircularVertexBuffer<SMY_VERTEX3> * pDynamicVertexBuffer;
 
@@ -193,9 +193,9 @@ static std::vector<size_t> RoomDrawList;
 
 //*************************************************************************************
 //*************************************************************************************
-Vec2f getWaterFxUvOffset(const Vec3f & odtv)
+Vec2f getWaterFxUvOffset(float watereffect, const Vec3f & odtv)
 {
-	return Vec2f(std::sin(WATEREFFECT + odtv.x), std::cos(WATEREFFECT + odtv.z));
+	return Vec2f(std::sin(watereffect + odtv.x), std::cos(watereffect + odtv.z));
 }
 
 static void ApplyLavaGlowToVertex(const Vec3f & odtv,TexturedVertex * dtv, float power) {
@@ -211,15 +211,15 @@ static void ApplyLavaGlowToVertex(const Vec3f & odtv,TexturedVertex * dtv, float
 }
 
 static void ManageWater_VertexBuffer(EERIEPOLY * ep, const long to,
-                                     const unsigned long tim, SMY_VERTEX * _pVertex) {
+                                     float uvScroll, SMY_VERTEX * _pVertex) {
 	
 	for(long k = 0; k < to; k++) {
 		ep->tv[k].uv = ep->v[k].uv;
 		
-		ep->tv[k].uv += getWaterFxUvOffset(ep->v[k].p) * (0.35f * 0.05f);
+		ep->tv[k].uv += getWaterFxUvOffset(WATEREFFECT, ep->v[k].p) * (0.35f * 0.05f);
 			
 		if(ep->type & POLY_FALL) {
-			ep->tv[k].uv.y -= (float)(tim) * (1.f/1000);
+			ep->tv[k].uv.y -= uvScroll;
 		}
 		
 		_pVertex[ep->uslInd[k]].uv = ep->tv[k].uv;
@@ -227,32 +227,20 @@ static void ManageWater_VertexBuffer(EERIEPOLY * ep, const long to,
 }
 
 static void ManageLava_VertexBuffer(EERIEPOLY * ep, const long to,
-                                    const unsigned long tim, SMY_VERTEX * _pVertex) {
+                                    float uvScroll, SMY_VERTEX * _pVertex) {
 	
 	for(long k = 0; k < to; k++) {
 		ep->tv[k].uv = ep->v[k].uv;
 		
-		ep->tv[k].uv += getWaterFxUvOffset(ep->v[k].p) * (0.35f * 0.05f); //0.25f
+		ep->tv[k].uv += getWaterFxUvOffset(WATEREFFECT, ep->v[k].p) * (0.35f * 0.05f); //0.25f
 		ApplyLavaGlowToVertex(ep->v[k].p, &ep->tv[k], 0.6f);
 			
 		if(ep->type & POLY_FALL) {
-			ep->tv[k].uv.y -= (float)(tim) * (1.f/12000);
+			ep->tv[k].uv.y -= uvScroll;
 		}
 		
 		_pVertex[ep->uslInd[k]].uv = ep->tv[k].uv;
 	}
-}
-
-static void EERIERTPPoly2(EERIEPOLY & ep) {
-	
-	EE_RTP(ep.v[0].p, ep.tv[0]);
-	EE_RTP(ep.v[1].p, ep.tv[1]);
-	EE_RTP(ep.v[2].p, ep.tv[2]);
-
-	if(ep.type & POLY_QUAD)
-		EE_RTP(ep.v[3].p, ep.tv[3]);
-	else
-		ep.tv[3].p.z=1.f;
 }
 
 bool IsSphereInFrustrum(const Vec3f & point, const EERIE_FRUSTRUM & frustrum, float radius = 0.f);
@@ -558,7 +546,7 @@ long ARX_PORTALS_GetRoomNumForPosition(const Vec3f & pos,long flag) {
 			const EERIE_ROOM_DATA & room = portals->rooms[n];
 			for(long lll = 0; lll < room.nb_portals; lll++) {
 				const EERIE_PORTALS & po = portals->portals[room.portals[lll]];
-				const EERIEPOLY *epp = &po.poly;
+				const PortalPoly *epp = &po.poly;
 
 				if(PointIn2DPolyXZ(epp, pos.x, pos.z)) {
 					float yy;
@@ -690,7 +678,7 @@ static Plane CreatePlane(const Vec3f & orgn, const Vec3f & pt1, const Vec3f & pt
 	return plane;
 }
 
-static EERIE_FRUSTRUM CreateFrustrum(const Vec3f & pos, const EERIEPOLY & ep, bool cull) {
+static EERIE_FRUSTRUM CreateFrustrum(const Vec3f & pos, const PortalPoly & ep, bool cull) {
 	
 	EERIE_FRUSTRUM frustrum;
 	
@@ -1071,7 +1059,7 @@ static long EERIERTPPoly(EERIEPOLY *ep) {
 
 static void ARX_PORTALS_Frustrum_RenderRoomTCullSoft(size_t room_num,
                                                      const EERIE_FRUSTRUM_DATA & frustrums,
-                                                     long now,
+                                                     ArxInstant now,
                                                      const Vec3f & camPos
 ) {
 	ARX_PROFILE_FUNC();
@@ -1095,22 +1083,22 @@ static void ARX_PORTALS_Frustrum_RenderRoomTCullSoft(size_t room_num,
 	for(long lll=0; lll<room.nb_polys; lll++) {
 		const EP_DATA & pEPDATA = room.epdata[lll];
 		
-		EERIE_BKG_INFO *feg = &ACTIVEBKG->fastdata[pEPDATA.p.x][pEPDATA.p.y];
+		BackgroundTileData *feg = &ACTIVEBKG->m_tileData[pEPDATA.tile.x][pEPDATA.tile.y];
 
 		if(!feg->treat) {
 			// TODO copy-paste background tiles
-			int tilex = pEPDATA.p.x;
-			int tilez = pEPDATA.p.y;
+			int tilex = pEPDATA.tile.x;
+			int tilez = pEPDATA.tile.y;
 			int radius = 1;
 			
 			int minx = std::max(tilex - radius, 0);
-			int maxx = std::min(tilex + radius, ACTIVEBKG->Xsize - 1);
+			int maxx = std::min(tilex + radius, ACTIVEBKG->m_size.x - 1);
 			int minz = std::max(tilez - radius, 0);
-			int maxz = std::min(tilez + radius, ACTIVEBKG->Zsize - 1);
+			int maxz = std::min(tilez + radius, ACTIVEBKG->m_size.y - 1);
 
 			for(int z = minz; z <= maxz; z++)
 			for(int x = minx; x <= maxx; x++) {
-				EERIE_BKG_INFO & feg2 = ACTIVEBKG->fastdata[x][z];
+				BackgroundTileData & feg2 = ACTIVEBKG->m_tileData[x][z];
 
 				if(!feg2.treat) {
 					feg2.treat = true;
@@ -1192,7 +1180,7 @@ static void ARX_PORTALS_Frustrum_RenderRoomTCullSoft(size_t room_num,
 				}
 			} else {
 				if(!(ep->type & POLY_TRANS)) {
-					ApplyTileLights(ep, pEPDATA.p);
+					ApplyTileLights(ep, pEPDATA.tile);
 
 					pMyVertexCurr[ep->uslInd[0]].color = ep->tv[0].color;
 					pMyVertexCurr[ep->uslInd[1]].color = ep->tv[1].color;
@@ -1204,10 +1192,12 @@ static void ARX_PORTALS_Frustrum_RenderRoomTCullSoft(size_t room_num,
 				}
 
 				if(ep->type & POLY_LAVA) {
-					ManageLava_VertexBuffer(ep, to, now, pMyVertexCurr);
+					float uvScroll = toMs(now) * (1.f/12000);
+					ManageLava_VertexBuffer(ep, to, uvScroll, pMyVertexCurr);
 					vPolyLava.push_back(ep);
 				} else if(ep->type & POLY_WATER) {
-					ManageWater_VertexBuffer(ep, to, now, pMyVertexCurr);
+					float uvScroll = toMs(now) * (1.f/1000);
+					ManageWater_VertexBuffer(ep, to, uvScroll, pMyVertexCurr);
 					vPolyWater.push_back(ep);
 				}
 			}
@@ -1218,7 +1208,7 @@ static void ARX_PORTALS_Frustrum_RenderRoomTCullSoft(size_t room_num,
 					continue;
 				}
 
-				ApplyTileLights(ep, pEPDATA.p);
+				ApplyTileLights(ep, pEPDATA.tile);
 
 				for(int k = 0; k < to; k++) {
 					long lr = Color::fromRGBA(ep->tv[k].color).r;
@@ -1398,7 +1388,7 @@ static void ARX_PORTALS_Frustrum_ComputeRoom(size_t roomIndex,
 		if(po->useportal)
 			continue;
 		
-		EERIEPOLY & epp = po->poly;
+		PortalPoly & epp = po->poly;
 	
 		//clipp NEAR & FAR
 		unsigned char ucVisibilityNear=0;
@@ -1420,9 +1410,7 @@ static void ARX_PORTALS_Frustrum_ComputeRoom(size_t roomIndex,
 
 		Vec3f pos = epp.center - camPos;
 		float fRes = glm::dot(pos, epp.norm);
-
-		EERIERTPPoly2(epp);
-
+		
 		if(!IsSphereInFrustrum(epp.center, frustrum, epp.v[0].rhw)) {
 			continue;
 		}
@@ -1456,7 +1444,7 @@ void ARX_SCENE_Update() {
 	
 	ArxInstant now = arxtime.now();
 	
-	WATEREFFECT = (now % long(2 * glm::pi<float>() / 0.0005f)) * 0.0005f;
+	WATEREFFECT = (toMs(now) % long(2 * glm::pi<float>() / 0.0005f)) * 0.0005f;
 	
 	const Vec3f camPos = ACTIVECAM->orgTrans.pos;
 	const float camDepth = ACTIVECAM->cdepth;
@@ -1466,17 +1454,17 @@ void ARX_SCENE_Update() {
 	short radius = clip3D + 4;
 
 	// TODO copy-paste background tiles
-	int tilex = int(camPos.x * ACTIVEBKG->Xmul);
-	int tilez = int(camPos.z * ACTIVEBKG->Zmul);
-	tilex = glm::clamp(tilex, 0, ACTIVEBKG->Xsize - 1);
-	tilez = glm::clamp(tilez, 0, ACTIVEBKG->Zsize - 1);
+	int tilex = int(camPos.x * ACTIVEBKG->m_mul.x);
+	int tilez = int(camPos.z * ACTIVEBKG->m_mul.y);
+	tilex = glm::clamp(tilex, 0, ACTIVEBKG->m_size.x - 1);
+	tilez = glm::clamp(tilez, 0, ACTIVEBKG->m_size.y - 1);
 
 	int minx = std::max(tilex - radius, 0);
-	int maxx = std::min(tilex + radius, ACTIVEBKG->Xsize - 1);
+	int maxx = std::min(tilex + radius, ACTIVEBKG->m_size.x - 1);
 	int minz = std::max(tilez - radius, 0);
-	int maxz = std::min(tilez + radius, ACTIVEBKG->Zsize - 1);
+	int maxz = std::min(tilez + radius, ACTIVEBKG->m_size.y - 1);
 
-	ACTIVEBKG->fastdata[tilex][tilez].treat = true;
+	ACTIVEBKG->m_tileData[tilex][tilez].treat = true;
 	TreatBackgroundDynlights();
 	PrecalcDynamicLighting(minx, minz, maxx, maxz, camPos, camDepth);
 
@@ -1485,7 +1473,7 @@ void ARX_SCENE_Update() {
 
 	for(short z = minz; z <= maxz; z++)
 	for(short x = minx; x < maxx; x++) {
-		ACTIVEBKG->fastdata[x][z].treat = false;
+		ACTIVEBKG->m_tileData[x][z].treat = false;
 	}
 
 	ResetTileLights();

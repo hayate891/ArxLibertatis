@@ -242,22 +242,28 @@ void ARX_INTERACTIVE_DestroyDynamicInfo(Entity * io)
 
 bool ARX_INTERACTIVE_Attach(EntityHandle n_source, EntityHandle n_target, const std::string& ap_source, const std::string& ap_target)
 {
-	if(!ValidIONum(n_source) || !ValidIONum(n_target))
+	Entity * source = entities.get(n_source);
+	Entity * target = entities.get(n_target);
+	
+	if(!source || !target)
 		return false;
 
-	entities[n_source]->show = SHOW_FLAG_LINKED;
-	EERIE_LINKEDOBJ_UnLinkObjectFromObject(entities[n_target]->obj, entities[n_source]->obj);
-	return EERIE_LINKEDOBJ_LinkObjectToObject(entities[n_target]->obj,
-	        entities[n_source]->obj, ap_target, ap_source, entities[n_source]);
+	source->show = SHOW_FLAG_LINKED;
+	EERIE_LINKEDOBJ_UnLinkObjectFromObject(target->obj, source->obj);
+	return EERIE_LINKEDOBJ_LinkObjectToObject(target->obj,
+	        source->obj, ap_target, ap_source, source);
 }
 
 void ARX_INTERACTIVE_Detach(EntityHandle n_source, EntityHandle n_target)
 {
-	if(!ValidIONum(n_source) || !ValidIONum(n_target))
+	Entity * source = entities.get(n_source);
+	Entity * target = entities.get(n_target);
+	
+	if(!source || !target)
 		return;
 
-	entities[n_source]->show = SHOW_FLAG_IN_SCENE;
-	EERIE_LINKEDOBJ_UnLinkObjectFromObject(entities[n_target]->obj, entities[n_source]->obj);
+	source->show = SHOW_FLAG_IN_SCENE;
+	EERIE_LINKEDOBJ_UnLinkObjectFromObject(target->obj, source->obj);
 }
 
 void ARX_INTERACTIVE_Show_Hide_1st(Entity * io, long state)
@@ -499,13 +505,10 @@ void PrepareIOTreatZone(long flag) {
 	short sGlobalPlayerRoom = checked_range_cast<short>(PlayerRoom);
 
 	for(size_t i = 0; i < MAX_EQUIPED; i++) {
-		if(ValidIONum(player.equiped[i])) {
-			Entity *toequip = entities[player.equiped[i]];
-
-			if(toequip) {
-				toequip->room = sGlobalPlayerRoom;
-				toequip->requestRoomUpdate = 0;
-			}
+		Entity * toequip = entities.get(player.equiped[i]);
+		if(toequip) {
+			toequip->room = sGlobalPlayerRoom;
+			toequip->requestRoomUpdate = 0;
 		}
 	}
 
@@ -684,7 +687,6 @@ void CleanScriptLoadedIO() {
 void RestoreInitialIOStatus() {
 	arx_assert(entities.player());
 	
-	ARX_INTERACTIVE_HideGore(entities.player());
 	ARX_NPC_Behaviour_ResetAll();
 	
 	entities.player()->spellcast_data.castingspell = SPELL_NONE;
@@ -835,7 +837,6 @@ static void ARX_INTERACTIVE_ClearIODynData_II(Entity * io) {
 }
 
 void ARX_INTERACTIVE_ClearAllDynData() {
-	ARX_INTERACTIVE_HideGore(entities.player());
 	ARX_NPC_Behaviour_ResetAll();
 	for(size_t i = 1; i < entities.size(); i++) {
 		const EntityHandle handle = EntityHandle(i);
@@ -1142,23 +1143,25 @@ void ARX_INTERACTIVE_TeleportBehindTarget(Entity * io)
 		long num = ARX_SCRIPT_Timer_GetFree();
 
 		if(num != -1) {
-			EntityHandle t = io->index();
 			ActiveTimers++;
-			scr_timer[num].es = NULL;
-			scr_timer[num].exist = 1;
-			scr_timer[num].io = io;
-			scr_timer[num].interval = ArxDurationMs(Random::get(3000, 6000));
-			scr_timer[num].name = "_r_a_t_";
-			scr_timer[num].pos = -1; 
-			scr_timer[num].start = arxtime.now();
-			scr_timer[num].count = 1;
-			entities[t]->show = SHOW_FLAG_TELEPORTING;
+			SCR_TIMER & timer = scr_timer[num];
+			
+			timer.es = NULL;
+			timer.exist = 1;
+			timer.io = io;
+			timer.interval = ArxDurationMs(Random::get(3000, 6000));
+			timer.name = "_r_a_t_";
+			timer.pos = -1;
+			timer.start = arxtime.now();
+			timer.count = 1;
+			
+			io->show = SHOW_FLAG_TELEPORTING;
 			AddRandomSmoke(io, 10);
 			ARX_PARTICLES_Add_Smoke(io->pos, 3, 20);
 			Vec3f pos;
-			pos.x = entities[t]->pos.x;
-			pos.y = entities[t]->pos.y + entities[t]->physics.cyl.height * ( 1.0f / 2 );
-			pos.z = entities[t]->pos.z;
+			pos.x = io->pos.x;
+			pos.y = io->pos.y + io->physics.cyl.height * ( 1.0f / 2 );
+			pos.z = io->pos.z;
 			io->requestRoomUpdate = true;
 			io->room = -1;
 			ARX_PARTICLES_Add_Smoke(pos, 3, 20);
@@ -1174,8 +1177,7 @@ void ResetVVPos(Entity * io)
 		io->_npcdata->vvpos = io->pos.y;
 }
 
-void ComputeVVPos(Entity * io)
-{
+void ComputeVVPos(Entity * io) {
 	if(io->ioflags & IO_NPC) {
 		float vvp = io->_npcdata->vvpos;
 
@@ -1192,33 +1194,39 @@ void ComputeVVPos(Entity * io)
 			fdiff = 120.f;
 		} else {
 			float mul = ((fdiff * ( 1.0f / 120 )) * 0.9f + 0.6f);
-
+			
+			float val;
+			if(io == entities.player()) {
+				val = toMs(g_platformTime.lastFrameDuration());
+			} else {
+				val = g_framedelay;
+			}
+			val *= (1.0f / 4) * mul;
+			
 			if(eediff < 15.f) {
-				float val = g_framedelay * ( 1.0f / 4 ) * mul;
-
 				if(eediff < 10.f) {
 					val *= ( 1.0f / 10 );
 				} else {
 					float ratio = (eediff - 10.f) * ( 1.0f / 5 );
 					val = val * ratio + val * (1.f - ratio); 
 				}
-
-				fdiff -= val;
-			} else {
-				fdiff -= g_framedelay * ( 1.0f / 4 ) * mul;
 			}
+			fdiff -= val;
 		}
-
-		if(fdiff > eediff)
+		
+		if(fdiff > eediff) {
 			fdiff = eediff;
-
-		if(fdiff < 0.f)
+		}
+		
+		if(fdiff < 0.f) {
 			fdiff = 0.f;
-
-		if(diff < 0.f)
+		}
+		
+		if(diff < 0.f) {
 			io->_npcdata->vvpos = io->pos.y + fdiff;
-		else
+		} else {
 			io->_npcdata->vvpos = io->pos.y - fdiff;
+		}
 	}
 }
 
@@ -1875,7 +1883,7 @@ Entity * GetFirstInterAtPos(const Vec2s & pos, long flag, Vec3f * _pRef, Entity 
 		if((io->ioflags & IO_CAMERA) || (io->ioflags & IO_MARKER))
 			continue;
 
-		if(!(io->gameFlags & GFLAG_INTERACTIVITY))
+		if(!flag && !(io->gameFlags & GFLAG_INTERACTIVITY))
 			continue;
 
 		// Is Object in TreatZone ??
@@ -2519,11 +2527,11 @@ void RenderInter() {
 
 static std::vector<Entity *> toDestroy;
 
-void ARX_INTERACTIVE_DestroyIOdelayed(Entity * entity) {
+bool ARX_INTERACTIVE_DestroyIOdelayed(Entity * entity) {
 	
 	if((entity->ioflags & IO_ITEM) && entity->_itemdata->count > 1) {
 		entity->_itemdata->count--;
-		return;
+		return false;
 	}
 	
 	LogDebug("will destroy entity " << entity->idString());
@@ -2531,6 +2539,7 @@ void ARX_INTERACTIVE_DestroyIOdelayed(Entity * entity) {
 		toDestroy.push_back(entity);
 	}
 	
+	return true;
 }
 
 void ARX_INTERACTIVE_DestroyIOdelayedRemove(Entity * entity) {
@@ -2631,9 +2640,9 @@ float ARX_INTERACTIVE_GetArmorClass(Entity * io) {
 
 void ARX_INTERACTIVE_ActivatePhysics(EntityHandle t)
 {
-	if(ValidIONum(t)) {
-		Entity * io = entities[t];
-
+	Entity * io = entities.get(t);
+	if(io) {
+		
 		if(io == DRAGINTER || (io->show != SHOW_FLAG_IN_SCENE))
 			return;
 

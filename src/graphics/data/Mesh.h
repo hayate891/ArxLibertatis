@@ -55,7 +55,7 @@ ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 
 class Entity;
 
-struct EERIE_BKG_INFO
+struct BackgroundTileData
 {
 	bool				treat;
 	short				nbpoly;
@@ -65,7 +65,7 @@ struct EERIE_BKG_INFO
 	EERIEPOLY **		polyin;
 	long *				ianchors; // index on anchors list
 	
-	EERIE_BKG_INFO()
+	BackgroundTileData()
 		: treat(false)
 		, nbpoly(0)
 		, nbianchors(0)
@@ -83,27 +83,21 @@ static const short BKG_SIZZ = 100;
 
 struct ANCHOR_DATA;
 
-struct EERIE_BACKGROUND
-{
-	EERIE_BKG_INFO	fastdata[MAX_BKGX][MAX_BKGZ];
+struct BackgroundData {
+	
 	long		exist;
-	short		Xsize;
-	short		Zsize;
-	short		Xdiv;
-	short		Zdiv;
-	float		Xmul;
-	float		Zmul;
+	Vec2s m_size;
+	Vec2s m_tileSize;
+	Vec2f m_mul;
+	BackgroundTileData m_tileData[MAX_BKGX][MAX_BKGZ];
 	long		  nbanchors;
 	ANCHOR_DATA * anchors;
 	
-	EERIE_BACKGROUND()
+	BackgroundData()
 		: exist(false)
-		, Xsize(0)
-		, Zsize(0)
-		, Xdiv(0)
-		, Zdiv(0)
-		, Xmul(0)
-		, Zmul(0)
+		, m_size(0, 0)
+		, m_tileSize(0, 0)
+		, m_mul(0, 0)
 		, nbanchors(0)
 		, anchors(NULL)
 	{ }
@@ -111,14 +105,12 @@ struct EERIE_BACKGROUND
 
 extern long EERIEDrawnPolys;
 
-extern EERIE_BACKGROUND * ACTIVEBKG;
+extern BackgroundData * ACTIVEBKG;
 extern EERIE_CAMERA * ACTIVECAM;
 
 //	Entity Struct End
 
-bool Visible(const Vec3f & orgn, const Vec3f & dest, Vec3f * hit);
-
-EERIE_BKG_INFO * getFastBackgroundData(float x, float z);
+BackgroundTileData * getFastBackgroundData(float x, float z);
 
 EERIEPOLY * CheckTopPoly(const Vec3f & pos);
 EERIEPOLY * CheckInPoly(const Vec3f & poss, float * needY = NULL);
@@ -139,6 +131,7 @@ EERIEPOLY * EEIsUnderWater(const Vec3f & pos);
  *         on the xz plane, true otherwise.
  */
 bool GetTruePolyY(const EERIEPOLY * ep, const Vec3f & pos, float * ret);
+bool GetTruePolyY(const PortalPoly * ep, const Vec3f & pos, float * ret);
 
 bool IsAnyPolyThere(float x, float z);
 bool IsVertexIdxInGroup(EERIE_3DOBJ * eobj, size_t idx, size_t grs);
@@ -146,8 +139,7 @@ EERIEPOLY * GetMinPoly(const Vec3f & pos);
 EERIEPOLY * GetMaxPoly(const Vec3f & pos);
  
 int PointIn2DPolyXZ(const EERIEPOLY * ep, float x, float z);
-
-int EERIELaunchRay3(const Vec3f & orgn, const Vec3f & dest, Vec3f & hit, long flag);
+int PointIn2DPolyXZ(const PortalPoly * ep, float x, float z);
 
 Vec3f EE_RT(const Vec3f & in);
 void EE_RTP(const Vec3f & in, TexturedVertex & out);
@@ -162,15 +154,15 @@ void Draw3DObject(EERIE_3DOBJ * eobj, const Anglef & angle, const Vec3f & pos, c
 
 //****************************************************************************
 // BACKGROUND MANAGEMENT FUNCTIONS START
-long BKG_CountPolys(const EERIE_BACKGROUND & eb);
-long BKG_CountIgnoredPolys(const EERIE_BACKGROUND & eb);
+long BKG_CountPolys(const BackgroundData & eb);
+long BKG_CountIgnoredPolys(const BackgroundData & eb);
 
 #if BUILD_EDIT_LOADSAVE
 void SceneAddMultiScnToBackground(EERIE_MULTI3DSCENE * ms);
 #endif
 
-void ClearBackground(EERIE_BACKGROUND * eb);
-int InitBkg(EERIE_BACKGROUND * eb, short sx, short sz, short Xdiv, short Zdiv);
+void ClearBackground(BackgroundData * eb);
+void InitBkg(BackgroundData * eb, short sx, short sz, Vec2s tileSize);
 
 void EERIEAddPoly(TexturedVertex * vert, TexturedVertex * vert2, TextureContainer * tex, long render, float transval);
 // BACKGROUND MANAGEMENT FUNCTIONS END
@@ -178,7 +170,8 @@ void EERIEAddPoly(TexturedVertex * vert, TexturedVertex * vert2, TextureContaine
 
 long MakeTopObjString(Entity * io, std::string& dest);
 bool TryToQuadify(EERIEPOLY * ep,EERIE_3DOBJ * eobj);
-Vec2f getWaterFxUvOffset(const Vec3f & odtv);
+
+Vec2f getWaterFxUvOffset(float watereffect, const Vec3f & odtv);
 
 //*************************************************************************************
 //*************************************************************************************

@@ -147,7 +147,6 @@ extern float SLID_VALUE;
 float lSLID_VALUE = 0;
 
 extern bool BLOCK_PLAYER_CONTROLS;
-extern long DeadTime;
 
 extern bool WILLRETURNTOFREELOOK;
 
@@ -1175,7 +1174,7 @@ void ArxGame::managePlayerControls() {
 	}
 	
 	// Checks JUMP Key Status.
-	if(player.jumpphase == NotJumping && GInput->actionNowPressed(CONTROLS_CUST_JUMP)) {
+	if(player.jumpphase == NotJumping && GInput->actionNowPressed(CONTROLS_CUST_JUMP) && !player.levitate) {
 		REQUEST_JUMP = arxtime.now();
 	}
 	
@@ -1285,7 +1284,7 @@ void ArxGame::managePlayerControls() {
 		}
 	}
 
-	if(((player.Interface & INTER_COMBATMODE) && !bIsAiming) || !player.doingmagic) {
+	if(((player.Interface & INTER_COMBATMODE) && !player.isAiming()) || !player.doingmagic) {
 		if(GInput->actionNowPressed(CONTROLS_CUST_PRECAST1)) {
 			ARX_SPELLS_Precast_Launch(PrecastHandle(0));
 		}

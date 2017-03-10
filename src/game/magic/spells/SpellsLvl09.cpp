@@ -35,12 +35,13 @@
 #include "game/spell/Cheat.h"
 #include "graphics/RenderBatcher.h"
 #include "graphics/particle/ParticleEffects.h"
+#include "math/RandomVector.h"
 #include "physics/Collisions.h"
 #include "scene/GameSound.h"
 #include "scene/Interactive.h"
 
-void SummonCreatureSpell::GetTargetAndBeta(Vec3f & target, float & beta)
-{
+void SummonCreatureSpell::GetTargetAndBeta(Vec3f & target, float & beta) {
+	
 	bool displace = false;
 	if(m_caster == EntityHandle_Player) {
 		target = player.basePosition();
@@ -66,8 +67,8 @@ SummonCreatureSpell::SummonCreatureSpell()
 }
 
 
-bool SummonCreatureSpell::CanLaunch()
-{
+bool SummonCreatureSpell::CanLaunch() {
+	
 	Vec3f target;
 	float beta;
 	GetTargetAndBeta(target, beta);
@@ -80,8 +81,8 @@ bool SummonCreatureSpell::CanLaunch()
 	return true;
 }
 
-void SummonCreatureSpell::Launch()
-{
+void SummonCreatureSpell::Launch() {
+	
 	m_hasDuration = true;
 	m_fManaCostPerSecond = 1.9f;
 	m_requestSummon = false;
@@ -117,9 +118,8 @@ void SummonCreatureSpell::End() {
 	lightHandleDestroy(m_light);
 	// need to killio
 	
-	if(ValidIONum(m_summonedEntity)) {
-		Entity * io = entities[m_summonedEntity];
-		
+	Entity * io = entities.get(m_summonedEntity);
+	if(io) {
 		ARX_SOUND_PlaySFX(SND_SPELL_ELECTRIC, &io->pos);
 		
 		if(io->scriptload && (io->ioflags & IO_NOSAVE)) {
@@ -148,8 +148,9 @@ void SummonCreatureSpell::End() {
 
 void SummonCreatureSpell::Update() {
 	
-	if(arxtime.is_paused())
+	if(arxtime.is_paused()) {
 		return;
+	}
 	
 	ArxDuration elapsed = arxtime.now() - m_timcreation;
 	
@@ -234,8 +235,9 @@ void SummonCreatureSpell::Update() {
 					io->speed_modif=1.f;
 				}
 				
-				if(ValidIONum(m_caster)) {
-					EVENT_SENDER = entities[m_caster];
+				Entity * caster = entities.get(m_caster);
+				if(caster) {
+					EVENT_SENDER = caster;
 				} else {
 					EVENT_SENDER = NULL;
 				}
@@ -244,16 +246,17 @@ void SummonCreatureSpell::Update() {
 				
 				for(long j = 0; j < 3; j++) {
 					Vec3f pos = m_fissure.m_eSrc;
-					pos += randomVec3f() * 100.f;
+					pos += arx::randomVec3f() * 100.f;
 					pos += Vec3f(-50.f, 50.f, -50.f);
 					
 					MakeCoolFx(pos);
 				}
 				
-				if(tokeep==1)
+				if(tokeep == 1) {
 					m_summonedEntity = io->index();
-				else
+				} else {
 					m_summonedEntity = EntityHandle();
+				}
 			}
 		}
 	} else if(m_summonedEntity == EntityHandle()) {
@@ -261,8 +264,7 @@ void SummonCreatureSpell::Update() {
 	}
 }
 
-bool FakeSummonSpell::CanLaunch()
-{
+bool FakeSummonSpell::CanLaunch() {
 	if(m_caster.handleData() <= EntityHandle_Player.handleData() || !ValidIONum(m_target)) {
 		return false;
 	}
@@ -270,8 +272,8 @@ bool FakeSummonSpell::CanLaunch()
 	return true;
 }
 
-void FakeSummonSpell::Launch()
-{
+void FakeSummonSpell::Launch() {
+	
 	m_hasDuration = true;
 	m_fManaCostPerSecond = 1.9f;
 	m_duration = ArxDurationMs(4000);
@@ -299,8 +301,7 @@ void FakeSummonSpell::Launch()
 	}
 }
 
-void FakeSummonSpell::End()
-{
+void FakeSummonSpell::End() {
 	ARX_SOUND_PlaySFX(SND_SPELL_ELECTRIC, &m_targetPos);
 	
 	lightHandleDestroy(m_light);
@@ -325,8 +326,8 @@ NegateMagicSpell::NegateMagicSpell()
 	, tex_sol(NULL)
 { }
 
-void NegateMagicSpell::Launch()
-{
+void NegateMagicSpell::Launch() {
+	
 	if(m_caster == EntityHandle_Player) {
 		m_target = EntityHandle_Player;
 	}
@@ -356,7 +357,10 @@ void NegateMagicSpell::Update() {
 	if(m_target == EntityHandle_Player) {
 		m_pos = player.basePosition();
 	} else {
-		m_pos = entities[m_target]->pos;
+		Entity * target = entities.get(m_target);
+		if(target) {
+			m_pos = target->pos;
+		}
 	}
 	
 	Vec3f stitepos = m_pos - Vec3f(0.f, 10.f, 0.f);
@@ -376,7 +380,7 @@ void NegateMagicSpell::Update() {
 				break;
 			}
 			
-			pd->ov = stitepos + Vec3f(Random::getf(-150.f, 150.f), 0.f, Random::getf(-150.f, 150.f));
+			pd->ov = stitepos + arx::randomOffsetXZ(150.f);
 			pd->move = Vec3f(0.f, Random::getf(-3.f, 0.f), 0.f);
 			pd->siz = 0.3f;
 			pd->tolive = Random::getu(2000, 4000);
@@ -406,20 +410,16 @@ void NegateMagicSpell::Update() {
 
 void NegateMagicSpell::LaunchAntiMagicField() {
 	
-	if(!ValidIONum(m_target))
+	if(!ValidIONum(m_target)) {
 		return;
+	}
 	
 	for(size_t i = 0; i < MAX_SPELLS; i++) {
 		SpellBase * spell = spells[SpellHandle(i)];
 		
-		if(!spell)
+		if(   !spell || this == spell || m_level < spell->m_level) {
 			continue;
-		
-		if(this == spell)
-			continue;
-		
-		if(m_level < spell->m_level)
-			continue;
+		}
 		
 		Vec3f pos = spell->getPosition();
 		if(closerThan(pos, entities[m_target]->pos, 600.f)) {
@@ -432,8 +432,8 @@ void NegateMagicSpell::LaunchAntiMagicField() {
 	}
 }
 
-bool IncinerateSpell::CanLaunch()
-{
+bool IncinerateSpell::CanLaunch() {
+	
 	Entity * tio = entities[m_target];
 	if((tio->ioflags & IO_NPC) && tio->_npcdata->lifePool.current <= 0.f) {
 		return false;
@@ -442,13 +442,13 @@ bool IncinerateSpell::CanLaunch()
 	return true;
 }
 
-void IncinerateSpell::Launch()
-{
+void IncinerateSpell::Launch() {
+	
 	Entity * tio = entities[m_target];
 	
-	ARX_SOUND_PlaySFX(SND_SPELL_INCINERATE, &entities[m_target]->pos);
+	ARX_SOUND_PlaySFX(SND_SPELL_INCINERATE, &tio->pos);
 	
-	m_snd_loop = ARX_SOUND_PlaySFX(SND_SPELL_INCINERATE_LOOP, &entities[m_target]->pos, 1.f, ARX_SOUND_PLAY_LOOPED);
+	m_snd_loop = ARX_SOUND_PlaySFX(SND_SPELL_INCINERATE_LOOP, &tio->pos, 1.f, ARX_SOUND_PLAY_LOOPED);
 	
 	m_duration = ArxDurationMs(20000);
 	
@@ -458,8 +458,8 @@ void IncinerateSpell::Launch()
 	m_targets.push_back(m_target);
 }
 
-void IncinerateSpell::End()
-{
+void IncinerateSpell::End() {
+	
 	m_targets.clear();
 	ARX_SOUND_Stop(m_snd_loop);
 	ARX_SOUND_PlaySFX(SND_SPELL_INCINERATE_END);
@@ -467,18 +467,20 @@ void IncinerateSpell::End()
 
 void IncinerateSpell::Update() {
 	
-	if(ValidIONum(m_target)) {
-		ARX_SOUND_RefreshPosition(m_snd_loop, entities[m_target]->pos);
+	Entity * target = entities.get(m_target);
+	if(target) {
+		ARX_SOUND_RefreshPosition(m_snd_loop, target->pos);
 	}	
 }
 
 Vec3f IncinerateSpell::getPosition() {
+	
 	return getTargetPosition();
 }
 
 
-void MassParalyseSpell::Launch()
-{
+void MassParalyseSpell::Launch() {
+	
 	ARX_SOUND_PlaySFX(SND_SPELL_MASS_PARALYSE);
 	
 	m_duration = (m_launchDuration > ArxDuration(-1)) ? m_launchDuration : ArxDurationMs(10000);
@@ -487,19 +489,12 @@ void MassParalyseSpell::Launch()
 		const EntityHandle handle = EntityHandle(ii);
 		Entity * tio = entities[handle];
 		
-		if(handle == m_caster || !tio || !(tio->ioflags & IO_NPC)) {
-			continue;
-		}
-		
-		if(tio->show != SHOW_FLAG_IN_SCENE) {
-			continue;
-		}
-		
-		if(tio->ioflags & IO_FREEZESCRIPT) {
-			continue;
-		}
-		
-		if(fartherThan(tio->pos, entities[m_caster]->pos, 500.f)) {
+		if(   handle == m_caster 
+		   || !tio || !(tio->ioflags & IO_NPC)
+		   || tio->show != SHOW_FLAG_IN_SCENE
+		   || (tio->ioflags & IO_FREEZESCRIPT)
+		   || fartherThan(tio->pos, entities[m_caster]->pos, 500.f)
+		) {
 			continue;
 		}
 		
@@ -510,11 +505,12 @@ void MassParalyseSpell::Launch()
 	}
 }
 
-void MassParalyseSpell::End()
-{
+void MassParalyseSpell::End() {
+	
 	BOOST_FOREACH(EntityHandle handle, m_targets) {
-		if(ValidIONum(handle)) {
-			entities[handle]->ioflags &= ~IO_FREEZESCRIPT;
+		Entity * target = entities.get(handle);
+		if(target) {
+			target->ioflags &= ~IO_FREEZESCRIPT;
 		}
 	}
 	

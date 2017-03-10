@@ -29,6 +29,7 @@ if "bpy" in locals():
     importlib.reload(sys.modules["arx_addon.dataLlf"])
     # importlib.reload(sys.modules["arx_addon.dataTea"])
 
+import bpy
 import bmesh
 import math
 import mathutils
@@ -75,9 +76,11 @@ def strip_wires(bm):
     for seq in [bm.verts, bm.faces, bm.edges]: seq.index_update()
     return bm
 
+class InconsistentStateException(Exception):
+    """Thrown if data supposed to be added to existing data does not match"""
+    pass
 
 import itertools
-
 
 class ArxObjectManager(object):
     def __init__(self, ioLib, dataPath):
@@ -101,11 +104,11 @@ class ArxObjectManager(object):
             seenFaceVerts[face.vids] = i
 
         if len(facesToDrop) > 0:
-            print("Dropping faces: " + str(facesToDrop))
+            log.debug("Dropping faces: " + str(facesToDrop))
 
         return facesToDrop
 
-    def createBmesh(self, vertData, faceData):
+    def createBmesh(self, vertData, faceData) -> bmesh.types.BMesh:
 
         facesToDrop = self.analyzeFaceData(faceData)
 
@@ -157,7 +160,7 @@ class ArxObjectManager(object):
 
         return bm
 
-    def createObject(self, bm, data, canonicalId):
+    def createObject(self, bm, data, canonicalId) -> bpy.types.Object:
 
         mesh = bpy.data.meshes.new("/".join(canonicalId))
         bm.to_mesh(mesh)
@@ -224,7 +227,7 @@ class ArxObjectManager(object):
         bpy.ops.object.mode_set(mode='OBJECT')
         return obj
 
-    def createArmature(self, canonicalId, bm, groups):
+    def createArmature(self, canonicalId, bm, groups) -> bpy.types.Object:
 
         amtname = "/".join(canonicalId)
         origin = (0, 0, 0)
@@ -270,8 +273,8 @@ class ArxObjectManager(object):
         print("Name: %s" % ftlFileName)
         return self.loadFile(ftlFileName)
 
-    def loadFile(self, filePath):
-        print("Loading file: %s" % filePath)
+    def loadFile(self, filePath) -> bpy.types.Object:
+        log.debug("Loading file: %s" % filePath)
 
         with open(filePath, "rb") as f:
             data = f.read()
@@ -301,7 +304,7 @@ class ArxObjectManager(object):
 
     # =============================================================
 
-    def toFtlData(self):
+    def toFtlData(self) -> FtlData:
 
         objs = [o for o in bpy.data.objects if o.type == 'MESH' and not o.hide]
 
@@ -311,11 +314,11 @@ class ArxObjectManager(object):
         obj = objs[0]
 
         canonicalId = obj.name.split("/")
-        self.log.info("Exporting Canonical Id: %s" % str(canonicalId))
+        self.log.debug("Exporting Canonical Id: %s" % str(canonicalId))
 
         # obj.update_from_editmode()
 
-        metadata = FtlMetadata(name=obj['arx.ftl.name'], org=obj['arx.ftl.org'])
+        metadata = FtlMetadata(name=obj.get('arx.ftl.name', ''), org=obj.get('arx.ftl.org', ''))
 
         bm = bmesh.new()
         bm.from_object(obj, bpy.context.scene)
@@ -411,7 +414,7 @@ class ArxObjectManager(object):
         with open(path, 'wb') as f:
             f.write(binData)
 
-        self.log.info("Written %i bytes to file %s" % (len(binData), path))
+        self.log.debug("Written %i bytes to file %s" % (len(binData), path))
         
 
 class ArxAnimationManager(object):
@@ -419,36 +422,60 @@ class ArxAnimationManager(object):
         self.log = logging.getLogger('ArxAnimationManager')
         self.teaSerializer = TeaSerializer()
         
-    def loadAnimation(self,path):
+    def loadAnimation(self, path):
         data = self.teaSerializer.read(path)
         
-        obj = bpy.context.active_object
-        armatureObj = bpy.data.objects[obj.name+'-amt']
+        selectedObj = bpy.context.active_object
+
+        #Walk up object tree to amature
+        walkObj = selectedObj
+        while not walkObj.name.endswith('-amt') and walkObj.parent:
+            walkObj = walkObj.parent
+
+        if not walkObj.name.endswith('-amt'):
+            self.log.warning("Amature object nof found for: {}".format(obj.name))
+            return
+
+        armatureObj = walkObj
+        obj = walkObj.children[0]
+
         bones = armatureObj.pose.bones
         
         bpy.context.scene.frame_set(1)
         for frame in data:
             bpy.context.scene.objects.active = obj
             
-            if 'translation' in frame:
-                translation = frame['translation']
+            if frame.translation:
+                translation = frame.translation
                 obj.location = (translation.x,translation.y,translation.z)
+                obj.keyframe_insert(data_path='location')
                 
-            if 'rotation' in frame:
-                rotation = frame['rotation']
+            if frame.rotation:
+                rotation = frame.rotation
                 obj.rotation_quaternion = (rotation.w,rotation.x,rotation.y,rotation.z)
-                
-            bpy.ops.anim.keyframe_insert(type='LocRotScale', confirm_success=False)
+                obj.keyframe_insert(data_path='rotation_quaternion')
+
+            #bpy.ops.anim.keyframe_insert(type='LocRotScale', confirm_success=False)
             
             bpy.context.scene.objects.active = armatureObj
             bpy.ops.object.mode_set(mode='POSE')
-            for groupIndex, group in enumerate(frame['groups']): # group index = bone index
+
+            if len(bones) != len(frame.groups):
+                #raise InconsistentStateException("Bones in amature must match animation groups, existing {} new {}".format(len(bones), len(frame['groups'])))
+                log.warning("Bones in amature must match animation groups, existing {} new {}".format(len(bones), len(frame.groups)))
+                #break
+
+            # This seems to be required to handle mismatched data
+            maxBone = min(len(bones), len(frame.groups))
+
+            for groupIndex in range(maxBone - 1, -1, -1): # group index = bone index
+                group = frame.groups[groupIndex]
                 bone = bones[groupIndex]
                 location = Vector((group.translate.x,group.translate.y,group.translate.z))
                 #self.log.info("moving bone to %s" % str(group.translate))
                 #bone.location = location
                 rotation = Quaternion((group.Quaternion.w,group.Quaternion.x,group.Quaternion.y,group.Quaternion.z))
-                self.log.info("rotating bone to %s" % str(rotation))
+                #self.log.info("rotating bone to %s" % str(rotation))
                 bone.rotation_quaternion = rotation
                 scale = Vector((group.zoom.x,group.zoom.y,group.zoom.z))
                 #self.log.info("scaling bone to %s" % str(group.zoom))
@@ -462,8 +489,8 @@ class ArxAnimationManager(object):
                 
             bpy.ops.object.mode_set(mode='OBJECT')
             
-            bpy.context.scene.frame_set(bpy.context.scene.frame_current+frame['duration'])  
-            self.log.info("Loaded Frame")
+            bpy.context.scene.frame_set(bpy.context.scene.frame_current + frame.duration)
+            #self.log.info("Loaded Frame")
         bpy.context.scene.frame_end = bpy.context.scene.frame_current
 
 
@@ -509,14 +536,14 @@ class ArxSceneManager(object):
         # Create materials
         mappedMaterials = []
         idx = 0
-        for tex in ftsData['textures']:
+        for tex in ftsData.textures:
             mappedMaterials.append((idx, tex.tc, createMaterial(self.dataPath, tex.fic.decode('iso-8859-1'))))
             idx += 1
 
         scn = bpy.context.scene
 
         # Create mesh
-        bm = self.AddSceneBackground(ftsData["cells"], mappedMaterials)
+        bm = self.AddSceneBackground(ftsData.cells, mappedMaterials)
         mesh = bpy.data.meshes.new(sceneName + "-mesh")
         bm.to_mesh(mesh)
         bm.free()
@@ -531,10 +558,11 @@ class ArxSceneManager(object):
         for idx, tcId, mat in mappedMaterials:
             obj.data.materials.append(mat)
 
-        # FIXME
+        self.AddScenePathfinderAnchors(scn, ftsData.anchors)
         self.AddScenePortals(scn, ftsData)
-        self.AddSceneLights(scn, llfData, ftsData["sceneOffset"])
-        self.AddSceneObjects(scn, dlfData, ftsData["sceneOffset"])
+        self.AddSceneLights(scn, llfData, ftsData.sceneOffset)
+        # TODO reenable object import
+        #self.AddSceneObjects(scn, dlfData, ftsData.sceneOffset)
 
     def AddSceneBackground(self, cells, mappedMaterials):
         bm = bmesh.new()
@@ -583,12 +611,40 @@ class ArxSceneManager(object):
         bm.edges.index_update()
         bm.transform(correctionMatrix)
         return bm
+    
+    def AddScenePathfinderAnchors(self, scene, anchors):
+        
+        bm = bmesh.new()
+        
+        bVerts = []
+        for anchor in anchors:
+            bVerts.append(bm.verts.new(anchor[0]))
+        
+        bm.verts.index_update()
+        
+        for i, anchor in enumerate(anchors):
+            for edge in anchor[1]:
+                #TODO this is a hack
+                try:
+                    bm.edges.new((bVerts[i], bVerts[edge]));
+                except ValueError:
+                    pass
+        
+        bm.transform(correctionMatrix)
+        mesh = bpy.data.meshes.new(scene.name + '-anchors-mesh')
+        bm.to_mesh(mesh)
+        bm.free()
+        obj = bpy.data.objects.new(scene.name + '-anchors', mesh)
+        obj.draw_type = 'WIRE'
+        obj.show_x_ray = True
+        scene.objects.link(obj)
+        
 
     def AddScenePortals(self, scene, data):
         groupObject = bpy.data.objects.new(scene.name + '-portals', None)
         scene.objects.link(groupObject)
 
-        for portal in data["portals"]:
+        for portal in data.portals:
             bm = bmesh.new()
 
             tempVerts = []
@@ -621,7 +677,7 @@ class ArxSceneManager(object):
         scene.objects.link(groupObject)
         groupObject.location = correctionMatrix * mathutils.Vector(sceneOffset)
 
-        for light in llfData["lights"]:
+        for light in llfData.lights:
             lampData = bpy.data.lamps.new(name=scene.name + "-lamp-data", type='POINT')
             lampData.use_specular = False
             lampData.color = (light.rgb.r, light.rgb.g, light.rgb.b)
@@ -637,7 +693,7 @@ class ArxSceneManager(object):
 
     def AddSceneObjects(self, scene, dlfData, sceneOffset):
 
-        for e in dlfData['entities']:
+        for e in dlfData.entities:
             classPath = \
             os.path.splitext('/graph' + e.name.decode('iso-8859-1').replace("\\", "/").lower().split("graph", 1)[1])[0]
             ident = e.ident

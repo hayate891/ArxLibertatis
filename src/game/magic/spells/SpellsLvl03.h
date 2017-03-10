@@ -65,13 +65,13 @@ public:
 private:
 	LightHandle m_light;
 	
-	long ulCurrentTime;
+	ArxDuration m_elapsed;
 
 	Vec3f eCurPos;
 	Vec3f eMove;
 	bool bExplo;
 	
-	long m_createBallDuration;
+	ArxDuration m_createBallDuration;
 };
 
 class CreateFoodSpell : public SpellBase {
@@ -85,7 +85,7 @@ public:
 private:
 	Vec3f m_pos;
 	ParticleSystem m_particles;
-	long m_currentTime;
+	ArxDuration m_elapsed;
 };
 
 
@@ -98,7 +98,7 @@ public:
 	void Update();
 	
 private:
-	unsigned long ulCurrentTime;
+	ArxDuration m_elapsed;
 	int iNumber;
 	int iMax;
 	float fColor;

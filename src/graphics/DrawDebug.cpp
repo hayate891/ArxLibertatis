@@ -106,7 +106,7 @@ void drawDebugCycleViews() {
 }
 
 static void drawDebugBoundingBox(const Rectf & box, Color color = Color::white) {
-	if(box.valid()) {
+	if(box.isValid()) {
 		drawLineRectangle(box, 0.01f, color);
 	}
 }
@@ -147,7 +147,7 @@ static void drawDebugLights() {
 			drawLineSphere(fallend, Color(Color3<u8>::red, 200));
 		}
 		
-		if(light->m_screenRect.valid())
+		if(light->m_screenRect.isValid())
 			drawDebugBoundingBox(light->m_screenRect);
 	}
 	
@@ -180,11 +180,11 @@ static void drawDebugPortals() {
 			color = Color::green;
 		}
 		
-		EERIEPOLY & epp = po.poly;
+		PortalPoly & epp = po.poly;
 
 		drawLine(epp.v[0].p, epp.v[1].p, color);
 		drawLine(epp.v[1].p, epp.v[3].p, color);
-		drawLine(epp.v[2].p, epp.v[3].p, color);
+		drawLine(epp.v[2].p, epp.v[3].p, color, color * 0.5f);
 		drawLine(epp.v[0].p, epp.v[2].p, color);
 		
 	}
@@ -552,9 +552,9 @@ static void drawDebugMaterialTexture(Vec2f & textpos, const std::string & type,
 	oss << ")";
 	std::string format = oss.str();
 	
-	float type_s = hFontDebug->getTextSize(type).x + 10;
-	float name_s = hFontDebug->getTextSize(name).x + 10;
-	float format_s = hFontDebug->getTextSize(format).x;
+	float type_s = hFontDebug->getTextSize(type).width() + 10;
+	float name_s = hFontDebug->getTextSize(name).width() + 10;
+	float format_s = hFontDebug->getTextSize(format).width();
 	
 	Vec2i pos = Vec2i(textpos);
 	pos.x -= (type_s + name_s + format_s) * 0.5f;
@@ -688,9 +688,9 @@ static void drawDebugMaterials() {
 		}
 	}
 	
-	for(short z = 0; z < ACTIVEBKG->Zsize; z++)
-	for(short x = 0; x < ACTIVEBKG->Xsize; x++) {
-		const EERIE_BKG_INFO & feg = ACTIVEBKG->fastdata[x][z];
+	for(short z = 0; z < ACTIVEBKG->m_size.y; z++)
+	for(short x = 0; x < ACTIVEBKG->m_size.x; x++) {
+		const BackgroundTileData & feg = ACTIVEBKG->m_tileData[x][z];
 		
 		if(!feg.treat) {
 			continue;
@@ -815,8 +815,7 @@ static void drawDebugMaterials() {
 			}
 			
 			if(pp[i].x < c.x) {
-				Vec2i size = hFontDebug->getTextSize(text);
-				textpos.x -= size.x;
+				textpos.x -= hFontDebug->getTextSize(text).width();
 			}
 			
 			hFontDebug->draw(textpos.x, textpos.y, text, Color::gray(0.7f));
@@ -934,7 +933,7 @@ void drawDebugRender() {
 		}
 	}
 	
-	s32 width = hFontDebug->getTextSize(ss.str()).x;
+	s32 width = hFontDebug->getTextSize(ss.str()).width();
 	Vec2i pos = g_size.topRight();
 	pos += Vec2i(-10 , 10);
 	pos += Vec2i(-width, 0);

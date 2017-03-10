@@ -77,6 +77,7 @@ ZeniMax Media Inc., Suite 120, Rockville, Maryland 20850 USA.
 #include "graphics/effects/Halo.h"
 
 #include "math/Angle.h"
+#include "math/RandomVector.h"
 #include "math/Vector.h"
 
 #include "physics/Collisions.h"
@@ -354,7 +355,7 @@ void Cedric_ApplyLightingFirstPartRefactor(Entity *io) {
 
 							ARX_PARTICLES_Spawn_Splat(sp.origin, 200.f, io->_npcdata->blood_color);
 
-							sp.origin = io->pos + randomVec3f() * Vec3f(200.f, 20.f,200.f) - Vec3f(100.f, 10.f, 100.f);
+							sp.origin = io->pos + arx::randomVec3f() * Vec3f(200.f, 20.f,200.f) - Vec3f(100.f, 10.f, 100.f);
 							sp.radius = Random::getf(100.f, 200.f);
 						}
 						
@@ -487,13 +488,13 @@ static bool Cedric_IO_Visible(const Vec3f & pos) {
 		//if(fartherThan(io->pos, ACTIVECAM->orgTrans.pos, ACTIVECAM->cdepth * 0.6f))
 		//	return false;
 
-		long xx = pos.x * ACTIVEBKG->Xmul;
-		long yy = pos.z * ACTIVEBKG->Zmul;
+		long xx = pos.x * ACTIVEBKG->m_mul.x;
+		long yy = pos.z * ACTIVEBKG->m_mul.y;
 
-		if(xx >= 1 && yy >= 1 && xx < ACTIVEBKG->Xsize-1 && yy < ACTIVEBKG->Zsize-1) {
+		if(xx >= 1 && yy >= 1 && xx < ACTIVEBKG->m_size.x-1 && yy < ACTIVEBKG->m_size.y-1) {
 			for(short z = yy - 1; z <= yy + 1; z++)
 			for(short x = xx - 1; x <= xx + 1; x++) {
-				const EERIE_BKG_INFO & feg = ACTIVEBKG->fastdata[x][z];
+				const BackgroundTileData & feg = ACTIVEBKG->m_tileData[x][z];
 				if(feg.treat)
 					return true;
 			}
@@ -507,7 +508,9 @@ static bool Cedric_IO_Visible(const Vec3f & pos) {
 
 /* Object dynamic lighting */
 static void Cedric_ApplyLighting(ShaderLight lights[], int lightsCount, EERIE_3DOBJ * eobj, Skeleton * obj, const ColorMod & colorMod) {
-
+	
+	ARX_PROFILE_FUNC();
+	
 	/* Apply light on all vertices */
 	for(size_t i = 0; i != obj->bones.size(); i++) {
 
@@ -734,6 +737,8 @@ static void AddFixedObjectHalo(const EERIE_FACE & face, const TransformInfo & t,
 	}
 }
 
+extern float WATEREFFECT;
+
 void DrawEERIEInter_Render(EERIE_3DOBJ *eobj, const TransformInfo &t, Entity *io, float invisibility) {
 
 	ColorMod colorMod;
@@ -788,7 +793,7 @@ void DrawEERIEInter_Render(EERIE_3DOBJ *eobj, const TransformInfo &t, Entity *io
 
 			// Treat WATER Polys (modify UVs)
 			if(face.facetype & POLY_WATER) {
-				tvList[n].uv += getWaterFxUvOffset(eobj->vertexlist[face.vid[n]].v) * (0.3f * 0.05f);
+				tvList[n].uv += getWaterFxUvOffset(WATEREFFECT, eobj->vertexlist[face.vid[n]].v) * (0.3f * 0.05f);
 			}
 
 			if(face.facetype & POLY_GLOW) {
@@ -1101,7 +1106,9 @@ static void AddAnimatedObjectHalo(HaloInfo & haloInfo, const unsigned short * pa
 }
 
 static void Cedric_RenderObject(EERIE_3DOBJ * eobj, Skeleton * obj, Entity * io, const Vec3f & pos, float invisibility) {
-
+	
+	ARX_PROFILE_FUNC();
+	
 	if(invisibility == 1.f)
 		return;
 
@@ -1376,7 +1383,7 @@ static void Cedric_BlendAnimation(Skeleton & rig, AnimationBlendStatus * animBle
 		return;
 	}
 
-	float timm = (arxtime.get_frame_time() - animBlend->lastanimtime) + 0.0001f;
+	float timm = (arxtime.get_frame_time() - toMs(animBlend->lastanimtime)) + 0.0001f;
 
 	if(timm >= 300.f) {
 		animBlend->m_active = false;

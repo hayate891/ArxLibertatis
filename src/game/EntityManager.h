@@ -54,6 +54,16 @@ public:
 		return entries[index.handleData()];
 	}
 	
+	Entity * get(EntityHandle handle) const {
+		
+		if(handle.handleData() < 0 || handle.handleData() >= long(size())) {
+			return NULL;
+		}
+		
+		return entries[handle.handleData()];
+	}
+	
+	
 	//! Get the player entity
 	Entity * player() const {
 		return entries[0];
@@ -73,6 +83,9 @@ public:
 	
 	iterator begin() const { return entries.begin(); }
 	iterator end() const { return entries.end(); }
+	
+	typedef bool (*AutocompleteHandler)(void * context, const std::string & suggestion);
+	void autocomplete(const std::string & prefix, AutocompleteHandler handler, void * context);
 	
 private:
 	

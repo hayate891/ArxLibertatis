@@ -73,6 +73,7 @@ enum ControlAction {
 	CONTROLS_CUST_CANCELCURSPELL,
 	CONTROLS_CUST_MINIMAP,
 	CONTROLS_CUST_TOGGLE_FULLSCREEN,
+	CONTROLS_CUST_CONSOLE,
 	NUM_ACTION_KEY
 };
 
@@ -182,6 +183,8 @@ public:
 		int mouseAcceleration;
 		bool rawMouseInput;
 		bool borderTurning;
+		bool useAltRuneRecognition;
+		bool allowConsole;
 		
 	} input;
 	
